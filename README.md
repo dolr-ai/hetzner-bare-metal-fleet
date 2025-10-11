@@ -29,6 +29,7 @@ btrfs filesystem usage /;
 lsblk -f;
 apt update -y;
 apt full-upgrade -y;
+apt autoremove -y;
 for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do apt-get remove $pkg; done
 # Add Docker's official GPG key:
 apt-get update
