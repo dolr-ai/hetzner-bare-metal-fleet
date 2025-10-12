@@ -1,10 +1,12 @@
-# Ubuntu Mechanism:
-- installimage with swraid 0 and btrfs for the root
+# installimage with swraid 0 and btrfs for the root
+
 ```bash
 PART btrfs.1    btrfs       all
 SUBVOL btrfs.1  @           /
 ```
-- reboot into system
+
+# btrfs setup script
+
 ```bash
 export DEBIAN_FRONTEND=noninteractive;
 lsblk -f;
@@ -27,6 +29,11 @@ btrfs filesystem show;
 df -h /;
 btrfs filesystem usage /;
 lsblk -f;
+```
+
+# Docker install script
+
+```bash
 apt update -y;
 apt full-upgrade -y;
 apt autoremove -y;
@@ -46,41 +53,37 @@ echo \
 apt-get update
 apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin;
 apt autoremove -y;
+```
+
+# Unattended upgrades
+
+```bash
 apt install unattended-upgrades;
 dpkg-reconfigure unattended-upgrades;
 ```
 
+# User Setup
 
-# Bootc Mechanism:
-- activate rescue system
 ```bash
-export DEBIAN_FRONTEND=noninteractive;
-# update
-apt update -y;
-apt full-upgrade -y;
-# podman
-apt install podman -y;
+useradd -m --shell /bin/bash --groups sudo,docker <username>;
+```
 
-# Remove prior partition table
-wipefs /dev/sda -a;
-wipefs /dev/sdb -a;
+# Setup SSH
 
-# Install bootc with btrfs
-podman run --rm --privileged --pid=host --network=host \
-  -v /var/lib/containers:/var/lib/containers \
-  -v /dev:/dev \
-  -v ~/.ssh/authorized_keys:/authorized_keys:ro \
-  --security-opt label=type:unconfined_t \
-  quay.io/fedora/fedora-bootc:latest \
-  bootc install to-disk --wipe --filesystem=btrfs \
-  --root-ssh-authorized-keys /authorized_keys /dev/sda;
+- `su` into user
 
-# Create unified RAID0 btrfs storage
-mkdir -p /mnt/root;
-mount /dev/sda3 /mnt/root;
-btrfs device add --force /dev/sdb /mnt/root;
-btrfs balance start --force -dconvert=raid0 -mconvert=raid0 /mnt/root;
-umount /mnt/root;
-reboot;
+```bash
+mkdir -p ~/.ssh;
+sudo cp /root/.ssh/authorized_keys ~/.ssh/;
+sudo chown -R $USER:$USER ~/.ssh;
+```
 
+# Turn off password authentication
+
+- Change to root
+
+```bash
+nano /etc/ssh/sshd_config
+# Change PasswordAuthentication to no
+service ssh restart
 ```
