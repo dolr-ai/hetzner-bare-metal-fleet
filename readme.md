@@ -5,10 +5,18 @@ PART btrfs.1    btrfs       all
 SUBVOL btrfs.1  @           /
 ```
 
+# update the system
+
+```bash
+# export DEBIAN_FRONTEND=noninteractive;
+apt update -y;
+apt full-upgrade -y;
+apt autoremove -y;
+```
+
 # btrfs setup script
 
 ```bash
-export DEBIAN_FRONTEND=noninteractive;
 lsblk -f;
 df -h;
 fdisk -l /dev/sda /dev/sdb;
@@ -66,6 +74,21 @@ dpkg-reconfigure unattended-upgrades;
 
 ```bash
 useradd -m --shell /bin/bash --groups sudo,docker <username>;
+passwd <username>;
+```
+
+# Turn off password authentication
+
+```bash
+nano /etc/ssh/sshd_config
+# Change PasswordAuthentication to no
+service ssh restart
+```
+
+# fail2ban setup
+
+```bash
+apt install fail2ban -y;
 ```
 
 # Setup SSH
@@ -78,12 +101,10 @@ sudo cp /root/.ssh/authorized_keys ~/.ssh/;
 sudo chown -R $USER:$USER ~/.ssh;
 ```
 
-# Turn off password authentication
-
-- Change to root
+## Passwordless sudo for special cases
 
 ```bash
-nano /etc/ssh/sshd_config
-# Change PasswordAuthentication to no
-service ssh restart
+visudo
+# Add the following line at the end of the file
+<username> ALL=(ALL) NOPASSWD:ALL
 ```
