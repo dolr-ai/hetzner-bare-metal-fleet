@@ -110,3 +110,9 @@ visudo
 # Add the following line at the end of the file
 <username> ALL=(ALL) NOPASSWD:ALL
 ```
+
+## Change Hostname
+
+```bash
+hostnamectl set-hostname <new-hostname>
+```
