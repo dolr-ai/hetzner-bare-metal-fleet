@@ -25,7 +25,7 @@ btrfs filesystem show;
 # If previously mdadm was used, stop and remove arrays
 mdadm --stop /dev/md0 /dev/md1 /dev/md2
 mdadm --zero-superblock /dev/sdb1 /dev/sdb2 /dev/sdb3;
-# blkdiscard /dev/sdb -f;
+# blkdiscard /dev/sda -f;
 # dd if=/dev/zero of=/dev/sda bs=1M status=progress;
 wipefs -a /dev/sdb;
 lsblk /dev/sdb;
