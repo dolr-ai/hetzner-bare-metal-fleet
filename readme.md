@@ -75,7 +75,7 @@ dpkg-reconfigure unattended-upgrades;
 # User Setup
 
 ```bash
-useradd -m --shell /bin/bash --groups sudo,docker <username>;
+useradd -m --shell /bin/bash --groups sudo,docker,systemd-journal <username>;
 passwd <username>;
 ```
 
