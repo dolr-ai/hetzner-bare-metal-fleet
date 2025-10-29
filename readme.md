@@ -93,24 +93,6 @@ service ssh restart
 apt install fail2ban -y;
 ```
 
-# Install Netdata
-
-```bash
-wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --stable-channel --disable-telemetry
-```
-
-Turn off Web UI
-
-```bash
-cd /etc/netdata
-./edit-config netdata.conf
-# Set web mode to none
-[web]
-  mode = none
-
-systemctl restart netdata
-```
-
 # Setup user account
 
 - `su` into user
