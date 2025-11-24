@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       target_hosts:
-        description: 'Target hosts (all, databases, development, infrastructure, applications, or specific host)'
+        description: "Target hosts (all, databases, development, infrastructure, applications, or specific host)"
         required: true
-        default: 'all'
+        default: "all"
         type: choice
         options:
           - all
@@ -25,35 +25,35 @@ on:
           - team-dev-server-1
           - uptime-monitor-1
       skip_reboot:
-        description: 'Skip automatic reboot even if required'
+        description: "Skip automatic reboot even if required"
         required: false
         default: false
         type: boolean
       dry_run:
-        description: 'Dry run mode (check only, no changes)'
+        description: "Dry run mode (check only, no changes)"
         required: false
         default: false
         type: boolean
 
   # Scheduled run (every Sunday at 2 AM UTC)
   schedule:
-    - cron: '0 2 * * 0'
+    - cron: "0 2 * * 0"
 
   # Allow triggering from other workflows
   workflow_call:
     inputs:
       target_hosts:
-        description: 'Target hosts'
+        description: "Target hosts"
         required: false
-        default: 'all'
+        default: "all"
         type: string
       skip_reboot:
-        description: 'Skip automatic reboot'
+        description: "Skip automatic reboot"
         required: false
         default: false
         type: boolean
       dry_run:
-        description: 'Dry run mode'
+        description: "Dry run mode"
         required: false
         default: false
         type: boolean
@@ -76,8 +76,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: "3.11"
 
       - name: Install Ansible and dependencies
         run: |
