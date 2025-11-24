@@ -1,6 +1,10 @@
 name: System Update via Ansible
 
 on:
+  # Trigger on push to main branch
+  push:
+    branches: [main]
+
   # Manual trigger
   workflow_dispatch:
     inputs:
@@ -118,7 +122,7 @@ jobs:
             --limit ${{ inputs.target_hosts || 'all' }} \
             -v \
             playbooks/system-update.yml \
-            ${{ inputs.enable_reboot == true && '-e enable_reboot=true' || '' }}
+            ${{ (inputs.enable_reboot == true || github.event_name == 'push' || github.event_name == 'schedule') && '-e enable_reboot=true' || '' }}
 
       - name: Generate update summary
         if: always()
