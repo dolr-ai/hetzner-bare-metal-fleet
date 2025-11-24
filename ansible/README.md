@@ -50,7 +50,7 @@ Configure this secret in your GitHub repository:
 
 | Secret Name | Description |
 |-------------|-------------|
-| `ANSIBLE_SSH_PRIVATE_KEY` | Your ed25519 SSH private key content |
+| `HETZNER_BARE_METAL_GITHUB_ACTIONS_SSH_PRIVATE_KEY` | Your ed25519 SSH private key content |
 
 All server IP addresses are configured directly in the inventory file.
 
