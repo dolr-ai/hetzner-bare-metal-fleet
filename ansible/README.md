@@ -32,7 +32,8 @@ ansible/
 │   └── hosts.yml              # Server inventory (configured)
 ├── playbooks/
 │   ├── system-update.yml      # Comprehensive system update
-│   └── docker-setup.yml       # Docker installation and setup
+│   ├── docker-setup.yml       # Docker installation and setup
+│   └── ssh-security.yml       # SSH security configuration and audit
 ├── quick-start.sh             # Interactive management script
 └── README.md                  # This file
 ```
@@ -75,7 +76,12 @@ ansible-playbook playbooks/system-update.yml
 ansible-playbook playbooks/docker-setup.yml
 ```
 
-4. **Target specific groups:**
+4. **Run SSH security audit and configuration:**
+```bash
+ansible-playbook playbooks/ssh-security.yml
+```
+
+5. **Target specific groups:**
 ```bash
 # Update all database servers
 ansible-playbook playbooks/system-update.yml --limit databases
@@ -90,13 +96,13 @@ ansible-playbook playbooks/system-update.yml --limit infrastructure
 ansible-playbook playbooks/system-update.yml --limit applications
 ```
 
-5. **Target specific servers:**
+6. **Target specific servers:**
 ```bash
 ansible-playbook playbooks/system-update.yml --limit dragonfly-db-1
 ansible-playbook playbooks/docker-setup.yml --limit postgres-1
 ```
 
-6. **Dry run (check mode):**
+7. **Dry run (check mode):**
 ```bash
 ansible-playbook playbooks/system-update.yml --check --diff
 ```
@@ -113,6 +119,7 @@ The script provides options to:
 - Test connectivity
 - Run system updates
 - Install Docker
+- Run SSH security audit
 - Perform dry runs
 - Target specific hosts or groups
 - View inventory
@@ -153,8 +160,6 @@ Comprehensive system maintenance playbook that:
 - Performs full system upgrade
 - Removes unnecessary packages (autoremove)
 - Cleans apt cache (autoclean)
-- Verifies SSH security configuration
-- Lists authorized SSH keys for audit
 - Checks for reboot requirements
 - Provides detailed upgrade summary
 - Includes error handling and connectivity checks
@@ -169,6 +174,18 @@ Docker installation and setup playbook that:
 - Verifies installation with test container
 - Supports both Ubuntu and Debian systems
 - Provides installation summary and status
+
+### ssh-security.yml
+SSH security configuration and audit playbook that:
+- Disables password authentication
+- Enables public key authentication only
+- Configures secure SSH settings (root login restrictions, protocol version, etc.)
+- Sets maximum authentication attempts
+- Audits and lists all authorized SSH keys for root user
+- Checks SSH key file permissions
+- Automatically fixes insecure key file permissions
+- Provides comprehensive security status reporting
+- Validates SSH configuration before applying changes
 
 ## Server Groups
 
@@ -239,6 +256,11 @@ ansible-playbook playbooks/system-update.yml --limit databases
 ansible-playbook playbooks/docker-setup.yml --limit development
 ```
 
+### Run SSH Security Audit on All Servers
+```bash
+ansible-playbook playbooks/ssh-security.yml
+```
+
 ### Update with Dry Run
 ```bash
 ansible-playbook playbooks/system-update.yml --check --diff --limit development
@@ -262,6 +284,11 @@ ansible-playbook playbooks/system-update.yml --limit hetzner_nuremberg
 ### Setup Docker on Specific Server
 ```bash
 ansible-playbook playbooks/docker-setup.yml --limit postgres-1
+```
+
+### SSH Security Check on Infrastructure Servers
+```bash
+ansible-playbook playbooks/ssh-security.yml --limit infrastructure
 ```
 
 ## Best Practices
@@ -291,6 +318,9 @@ ansible-playbook playbooks/system-update.yml
 
 # Install Docker everywhere
 ansible-playbook playbooks/docker-setup.yml
+
+# Check SSH security on all servers
+ansible-playbook playbooks/ssh-security.yml
 
 # Update just databases
 ansible-playbook playbooks/system-update.yml --limit databases
