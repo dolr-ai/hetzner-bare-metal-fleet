@@ -2,11 +2,15 @@
 - name: System Update and Upgrade
   hosts: all
   become: true
-  gather_facts: false
+  gather_facts: true
   vars:
     ansible_python_interpreter: /usr/bin/python3
 
   tasks:
+    - name: Wait for system to be ready
+      wait_for_connection:
+        timeout: 60
+
     - name: Check if system is Debian/Ubuntu
       fail:
         msg: "This playbook is designed for Debian/Ubuntu systems only"

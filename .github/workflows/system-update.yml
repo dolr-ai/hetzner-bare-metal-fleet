@@ -61,7 +61,6 @@ on:
 env:
   ANSIBLE_HOST_KEY_CHECKING: False
   ANSIBLE_FORCE_COLOR: True
-  ANSIBLE_STDOUT_CALLBACK: yaml
 
 jobs:
   system-update:
