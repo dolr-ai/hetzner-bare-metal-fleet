@@ -1,4 +1,4 @@
-name: System Update via Ansible
+name: Fleet Management via Ansible
 
 on:
   # Trigger on push to main branch
@@ -28,6 +28,21 @@ on:
           - storj-interface-1
           - team-dev-server-1
           - uptime-monitor-1
+      run_ssh_security:
+        description: "Run SSH security audit and configuration"
+        required: false
+        default: true
+        type: boolean
+      run_docker_setup:
+        description: "Run Docker installation if missing"
+        required: false
+        default: true
+        type: boolean
+      run_system_update:
+        description: "Run system updates and upgrades"
+        required: false
+        default: true
+        type: boolean
       enable_reboot:
         description: "Enable automatic reboot if required"
         required: false
@@ -67,10 +82,10 @@ env:
   ANSIBLE_FORCE_COLOR: True
 
 jobs:
-  system-update:
-    name: Update Systems
+  fleet-management:
+    name: Fleet Management
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
 
     steps:
       - name: Checkout repository
@@ -103,8 +118,48 @@ jobs:
           cd ansible
           ansible ${{ inputs.target_hosts || 'all' }} -m ping -v
 
+      - name: Run SSH security playbook (dry run)
+        if: ${{ inputs.dry_run == true && (inputs.run_ssh_security == true || github.event_name == 'push' || github.event_name == 'schedule') }}
+        run: |
+          cd ansible
+          ansible-playbook \
+            --limit ${{ inputs.target_hosts || 'all' }} \
+            --check \
+            --diff \
+            -v \
+            playbooks/ssh-security.yml
+
+      - name: Run SSH security playbook
+        if: ${{ inputs.dry_run != true && (inputs.run_ssh_security == true || github.event_name == 'push' || github.event_name == 'schedule') }}
+        run: |
+          cd ansible
+          ansible-playbook \
+            --limit ${{ inputs.target_hosts || 'all' }} \
+            -v \
+            playbooks/ssh-security.yml
+
+      - name: Run Docker setup playbook (dry run)
+        if: ${{ inputs.dry_run == true && (inputs.run_docker_setup == true || github.event_name == 'push' || github.event_name == 'schedule') }}
+        run: |
+          cd ansible
+          ansible-playbook \
+            --limit ${{ inputs.target_hosts || 'all' }} \
+            --check \
+            --diff \
+            -v \
+            playbooks/docker-setup.yml
+
+      - name: Run Docker setup playbook
+        if: ${{ inputs.dry_run != true && (inputs.run_docker_setup == true || github.event_name == 'push' || github.event_name == 'schedule') }}
+        run: |
+          cd ansible
+          ansible-playbook \
+            --limit ${{ inputs.target_hosts || 'all' }} \
+            -v \
+            playbooks/docker-setup.yml
+
       - name: Run system update playbook (dry run)
-        if: ${{ inputs.dry_run == true }}
+        if: ${{ inputs.dry_run == true && (inputs.run_system_update == true || github.event_name == 'push' || github.event_name == 'schedule') }}
         run: |
           cd ansible
           ansible-playbook \
@@ -115,7 +170,7 @@ jobs:
             playbooks/system-update.yml
 
       - name: Run system update playbook
-        if: ${{ inputs.dry_run != true }}
+        if: ${{ inputs.dry_run != true && (inputs.run_system_update == true || github.event_name == 'push' || github.event_name == 'schedule') }}
         run: |
           cd ansible
           ansible-playbook \
@@ -128,8 +183,11 @@ jobs:
         if: always()
         run: |
           cd ansible
-          echo "## System Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## Fleet Management Summary" >> $GITHUB_STEP_SUMMARY
           echo "**Target:** ${{ inputs.target_hosts || 'all' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**SSH Security:** ${{ inputs.run_ssh_security || 'true (auto)' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Docker Setup:** ${{ inputs.run_docker_setup || 'true (auto)' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**System Update:** ${{ inputs.run_system_update || 'true (auto)' }}" >> $GITHUB_STEP_SUMMARY
           echo "**Dry Run:** ${{ inputs.dry_run || 'false' }}" >> $GITHUB_STEP_SUMMARY
           echo "**Enable Reboot:** ${{ inputs.enable_reboot || 'false' }}" >> $GITHUB_STEP_SUMMARY
           echo "**Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
@@ -154,5 +212,5 @@ jobs:
       - name: Notify on failure
         if: failure()
         run: |
-          echo "::error::System update failed for target: ${{ inputs.target_hosts || 'all' }}"
+          echo "::error::Fleet management failed for target: ${{ inputs.target_hosts || 'all' }}"
           echo "Check the logs and artifacts for more details."
