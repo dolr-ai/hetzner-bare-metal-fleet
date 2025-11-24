@@ -24,8 +24,8 @@ on:
           - storj-interface-1
           - team-dev-server-1
           - uptime-monitor-1
-      skip_reboot:
-        description: "Skip automatic reboot even if required"
+      enable_reboot:
+        description: "Enable automatic reboot if required"
         required: false
         default: false
         type: boolean
@@ -47,8 +47,8 @@ on:
         required: false
         default: "all"
         type: string
-      skip_reboot:
-        description: "Skip automatic reboot"
+      enable_reboot:
+        description: "Enable automatic reboot"
         required: false
         default: false
         type: boolean
@@ -118,7 +118,7 @@ jobs:
             --limit ${{ inputs.target_hosts || 'all' }} \
             -v \
             playbooks/system-update.yml \
-            ${{ inputs.skip_reboot == true && '--skip-tags reboot' || '' }}
+            ${{ inputs.enable_reboot == true && '-e enable_reboot=true' || '' }}
 
       - name: Generate update summary
         if: always()
@@ -127,7 +127,7 @@ jobs:
           echo "## System Update Summary" >> $GITHUB_STEP_SUMMARY
           echo "**Target:** ${{ inputs.target_hosts || 'all' }}" >> $GITHUB_STEP_SUMMARY
           echo "**Dry Run:** ${{ inputs.dry_run || 'false' }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Skip Reboot:** ${{ inputs.skip_reboot || 'false' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Enable Reboot:** ${{ inputs.enable_reboot || 'false' }}" >> $GITHUB_STEP_SUMMARY
           echo "**Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
 
           if [ -f ansible.log ]; then

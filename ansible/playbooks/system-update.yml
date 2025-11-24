@@ -65,7 +65,19 @@
           Upgrade Summary:
           - Packages upgraded: {{ upgrade_result.stdout_lines | length if upgrade_result is defined and upgrade_result.stdout_lines is defined else 0 }}
           - Reboot required: {{ 'Yes' if reboot_required.stat.exists else 'No' }}
+          - Reboot enabled: {{ 'Yes' if enable_reboot is defined and enable_reboot else 'No' }}
       when: upgrade_result is defined
+
+    - name: Reboot system if required and enabled
+      reboot:
+        msg: "Rebooting system after package upgrades"
+        reboot_timeout: 300
+        connect_timeout: 20
+        test_command: uptime
+      when:
+        - reboot_required.stat.exists
+        - enable_reboot is defined
+        - enable_reboot | bool
 
   handlers:
     - name: Reboot system if required
