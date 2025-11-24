@@ -49,7 +49,7 @@ on:
         default: false
         type: boolean
       dry_run:
-        description: "Dry run mode (check only, no changes)"
+        description: "Dry run mode (check only, no changes) - opt-in"
         required: false
         default: false
         type: boolean
@@ -119,7 +119,7 @@ jobs:
           ansible ${{ inputs.target_hosts || 'all' }} -m ping -v
 
       - name: Run SSH security playbook (dry run)
-        if: ${{ inputs.dry_run == true && (inputs.run_ssh_security == true || github.event_name == 'push' || github.event_name == 'schedule') }}
+        if: ${{ inputs.dry_run == true && (inputs.run_ssh_security == true || inputs.run_ssh_security == null) }}
         run: |
           cd ansible
           ansible-playbook \
@@ -130,7 +130,7 @@ jobs:
             playbooks/ssh-security.yml
 
       - name: Run SSH security playbook
-        if: ${{ inputs.dry_run != true && (inputs.run_ssh_security == true || github.event_name == 'push' || github.event_name == 'schedule') }}
+        if: ${{ inputs.dry_run != true && (inputs.run_ssh_security == true || inputs.run_ssh_security == null || github.event_name == 'push' || github.event_name == 'schedule') }}
         run: |
           cd ansible
           ansible-playbook \
@@ -139,7 +139,7 @@ jobs:
             playbooks/ssh-security.yml
 
       - name: Run Docker setup playbook (dry run)
-        if: ${{ inputs.dry_run == true && (inputs.run_docker_setup == true || github.event_name == 'push' || github.event_name == 'schedule') }}
+        if: ${{ inputs.dry_run == true && (inputs.run_docker_setup == true || inputs.run_docker_setup == null) }}
         run: |
           cd ansible
           ansible-playbook \
@@ -150,7 +150,7 @@ jobs:
             playbooks/docker-setup.yml
 
       - name: Run Docker setup playbook
-        if: ${{ inputs.dry_run != true && (inputs.run_docker_setup == true || github.event_name == 'push' || github.event_name == 'schedule') }}
+        if: ${{ inputs.dry_run != true && (inputs.run_docker_setup == true || inputs.run_docker_setup == null || github.event_name == 'push' || github.event_name == 'schedule') }}
         run: |
           cd ansible
           ansible-playbook \
@@ -159,7 +159,7 @@ jobs:
             playbooks/docker-setup.yml
 
       - name: Run system update playbook (dry run)
-        if: ${{ inputs.dry_run == true && (inputs.run_system_update == true || github.event_name == 'push' || github.event_name == 'schedule') }}
+        if: ${{ inputs.dry_run == true && (inputs.run_system_update == true || inputs.run_system_update == null) }}
         run: |
           cd ansible
           ansible-playbook \
@@ -170,7 +170,7 @@ jobs:
             playbooks/system-update.yml
 
       - name: Run system update playbook
-        if: ${{ inputs.dry_run != true && (inputs.run_system_update == true || github.event_name == 'push' || github.event_name == 'schedule') }}
+        if: ${{ inputs.dry_run != true && (inputs.run_system_update == true || inputs.run_system_update == null || github.event_name == 'push' || github.event_name == 'schedule') }}
         run: |
           cd ansible
           ansible-playbook \

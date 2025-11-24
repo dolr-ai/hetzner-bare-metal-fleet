@@ -116,4 +116,4 @@
           - Docker Version: {{ docker_verify.stdout }}
           - Installation Status: {{ 'Previously installed' if docker_check.rc == 0 else 'Newly installed' }}
           - Service Status: Running and enabled
-          - Test Result: {{ 'PASSED' if docker_test is defined and docker_test.rc == 0 else 'SKIPPED (already installed)' }}
+          - Test Result: {{ 'PASSED' if (docker_test is defined and docker_test.rc is defined and docker_test.rc == 0) else 'SKIPPED (already installed)' }}
