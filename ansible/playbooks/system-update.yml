@@ -10,6 +10,84 @@
       wait_for_connection:
         timeout: 60
 
+    - name: Check if Netdata is installed
+      stat:
+        path: /usr/sbin/netdata
+      register: netdata_installed
+
+    - name: Download Netdata uninstall script
+      get_url:
+        url: https://get.netdata.cloud/kickstart.sh
+        dest: /tmp/netdata-kickstart.sh
+        mode: "0755"
+      when: netdata_installed.stat.exists
+
+    - name: Remove Netdata using official uninstaller
+      shell: |
+        echo "yes" | sh /tmp/netdata-kickstart.sh --uninstall
+      when: netdata_installed.stat.exists
+      ignore_errors: true
+
+    - name: Clean up Netdata directories and files
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /opt/netdata
+        - /etc/netdata
+        - /var/lib/netdata
+        - /var/cache/netdata
+        - /var/log/netdata
+        - /usr/share/netdata
+        - /usr/libexec/netdata
+        - /tmp/netdata-kickstart.sh
+        - /tmp/netdata*
+      when: netdata_installed.stat.exists
+
+    - name: Remove Netdata user and group
+      user:
+        name: netdata
+        state: absent
+        remove: true
+      when: netdata_installed.stat.exists
+      ignore_errors: true
+
+    - name: Remove Netdata group
+      group:
+        name: netdata
+        state: absent
+      when: netdata_installed.stat.exists
+      ignore_errors: true
+
+    - name: Remove Netdata systemd service files
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/systemd/system/netdata.service
+        - /lib/systemd/system/netdata.service
+        - /usr/lib/systemd/system/netdata.service
+      when: netdata_installed.stat.exists
+
+    - name: Reload systemd daemon after service removal
+      systemd:
+        daemon_reload: true
+      when: netdata_installed.stat.exists
+
+    - name: Clean up any remaining Netdata packages
+      shell: |
+        dpkg -l | grep -i netdata | awk '{print $2}' | xargs -r apt-get purge -y
+      when: netdata_installed.stat.exists
+      ignore_errors: true
+
+    - name: Clean up temporary files and package cache
+      shell: |
+        rm -rf /tmp/netdata* /var/tmp/netdata*
+        apt-get autoremove -y
+        apt-get autoclean
+      when: netdata_installed.stat.exists
+      ignore_errors: true
+
     - name: Check if system is Debian/Ubuntu
       fail:
         msg: "This playbook is designed for Debian/Ubuntu systems only"
