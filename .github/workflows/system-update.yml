@@ -1,0 +1,156 @@
+name: System Update via Ansible
+
+on:
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      target_hosts:
+        description: 'Target hosts (all, databases, development, infrastructure, applications, or specific host)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - databases
+          - development
+          - infrastructure
+          - applications
+          - data-science-staging-1
+          - dragonfly-db-1
+          - github-action-runner-1
+          - milvus-1
+          - postgres-1
+          - sentry-1
+          - storj-interface-1
+          - team-dev-server-1
+          - uptime-monitor-1
+      skip_reboot:
+        description: 'Skip automatic reboot even if required'
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: 'Dry run mode (check only, no changes)'
+        required: false
+        default: false
+        type: boolean
+
+  # Scheduled run (every Sunday at 2 AM UTC)
+  schedule:
+    - cron: '0 2 * * 0'
+
+  # Allow triggering from other workflows
+  workflow_call:
+    inputs:
+      target_hosts:
+        description: 'Target hosts'
+        required: false
+        default: 'all'
+        type: string
+      skip_reboot:
+        description: 'Skip automatic reboot'
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: 'Dry run mode'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  ANSIBLE_HOST_KEY_CHECKING: False
+  ANSIBLE_FORCE_COLOR: True
+  ANSIBLE_STDOUT_CALLBACK: yaml
+
+jobs:
+  system-update:
+    name: Update Systems
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Ansible and dependencies
+        run: |
+          pip install --upgrade pip
+          pip install ansible ansible-core
+          ansible-galaxy collection install ansible.posix community.general
+
+      - name: Set up SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.ANSIBLE_SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # Add SSH agent configuration
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_ed25519
+
+      - name: Test Ansible connectivity
+        run: |
+          cd ansible
+          ansible ${{ inputs.target_hosts || 'all' }} -m ping -v
+
+      - name: Run system update playbook (dry run)
+        if: ${{ inputs.dry_run == true }}
+        run: |
+          cd ansible
+          ansible-playbook \
+            --limit ${{ inputs.target_hosts || 'all' }} \
+            --check \
+            --diff \
+            -v \
+            playbooks/system-update.yml
+
+      - name: Run system update playbook
+        if: ${{ inputs.dry_run != true }}
+        run: |
+          cd ansible
+          ansible-playbook \
+            --limit ${{ inputs.target_hosts || 'all' }} \
+            -v \
+            playbooks/system-update.yml \
+            ${{ inputs.skip_reboot == true && '--skip-tags reboot' || '' }}
+
+      - name: Generate update summary
+        if: always()
+        run: |
+          cd ansible
+          echo "## System Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "**Target:** ${{ inputs.target_hosts || 'all' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Dry Run:** ${{ inputs.dry_run || 'false' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Skip Reboot:** ${{ inputs.skip_reboot || 'false' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f ansible.log ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Ansible Log Summary" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            tail -20 ansible.log >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload Ansible logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ansible-logs-${{ github.run_id }}
+          path: |
+            ansible/ansible.log
+          retention-days: 30
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::System update failed for target: ${{ inputs.target_hosts || 'all' }}"
+          echo "Check the logs and artifacts for more details."

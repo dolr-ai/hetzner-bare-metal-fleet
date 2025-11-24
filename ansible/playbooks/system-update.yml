@@ -1,0 +1,75 @@
+---
+- name: System Update and Upgrade
+  hosts: all
+  become: true
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+
+  tasks:
+    - name: Check if system is Debian/Ubuntu
+      fail:
+        msg: "This playbook is designed for Debian/Ubuntu systems only"
+      when: ansible_os_family != "Debian"
+
+    - name: Update apt package cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      register: apt_update_result
+      retries: 3
+      delay: 10
+      until: apt_update_result is succeeded
+
+    - name: Check for available package upgrades
+      shell: apt list --upgradable 2>/dev/null | grep -c upgradable || true
+      register: upgradable_packages
+      changed_when: false
+
+    - name: Display number of upgradable packages
+      debug:
+        msg: "{{ upgradable_packages.stdout }} packages are available for upgrade"
+
+    - name: Perform full system upgrade
+      apt:
+        upgrade: full
+        autoremove: yes
+        autoclean: yes
+      register: upgrade_result
+      when: upgradable_packages.stdout|int > 0
+
+    - name: Check if reboot is required
+      stat:
+        path: /var/run/reboot-required
+      register: reboot_required
+
+    - name: Display reboot requirement
+      debug:
+        msg: "System reboot is {{ 'required' if reboot_required.stat.exists else 'not required' }}"
+
+    - name: Remove unnecessary packages
+      apt:
+        autoremove: yes
+        purge: yes
+
+    - name: Clean apt cache
+      apt:
+        autoclean: yes
+
+    - name: Display upgrade summary
+      debug:
+        msg: |
+          Upgrade Summary:
+          - Packages upgraded: {{ upgrade_result.stdout_lines | length if upgrade_result is defined and upgrade_result.stdout_lines is defined else 0 }}
+          - Reboot required: {{ 'Yes' if reboot_required.stat.exists else 'No' }}
+      when: upgrade_result is defined
+
+  handlers:
+    - name: Reboot system if required
+      reboot:
+        msg: "Rebooting system after package upgrades"
+        reboot_timeout: 300
+        connect_timeout: 20
+        test_command: uptime
+      listen: "reboot required"
+      when: reboot_required.stat.exists
