@@ -31,7 +31,8 @@ ansible/
 ├── inventory/
 │   └── hosts.yml              # Server inventory (configured)
 ├── playbooks/
-│   └── system-update.yml      # Comprehensive system update
+│   ├── system-update.yml      # Comprehensive system update
+│   └── docker-setup.yml       # Docker installation and setup
 ├── quick-start.sh             # Interactive management script
 └── README.md                  # This file
 ```
@@ -69,7 +70,12 @@ ansible all -m ping
 ansible-playbook playbooks/system-update.yml
 ```
 
-3. **Target specific groups:**
+3. **Install Docker on all servers:**
+```bash
+ansible-playbook playbooks/docker-setup.yml
+```
+
+4. **Target specific groups:**
 ```bash
 # Update all database servers
 ansible-playbook playbooks/system-update.yml --limit databases
@@ -84,13 +90,13 @@ ansible-playbook playbooks/system-update.yml --limit infrastructure
 ansible-playbook playbooks/system-update.yml --limit applications
 ```
 
-4. **Target specific servers:**
+5. **Target specific servers:**
 ```bash
 ansible-playbook playbooks/system-update.yml --limit dragonfly-db-1
-ansible-playbook playbooks/system-update.yml --limit postgres-1
+ansible-playbook playbooks/docker-setup.yml --limit postgres-1
 ```
 
-5. **Dry run (check mode):**
+6. **Dry run (check mode):**
 ```bash
 ansible-playbook playbooks/system-update.yml --check --diff
 ```
@@ -106,6 +112,7 @@ cd ansible
 The script provides options to:
 - Test connectivity
 - Run system updates
+- Install Docker
 - Perform dry runs
 - Target specific hosts or groups
 - View inventory
@@ -146,10 +153,22 @@ Comprehensive system maintenance playbook that:
 - Performs full system upgrade
 - Removes unnecessary packages (autoremove)
 - Cleans apt cache (autoclean)
+- Verifies SSH security configuration
+- Lists authorized SSH keys for audit
 - Checks for reboot requirements
 - Provides detailed upgrade summary
 - Includes error handling and connectivity checks
 - Supports Debian/Ubuntu systems only
+
+### docker-setup.yml
+Docker installation and setup playbook that:
+- Checks if Docker is already installed
+- Removes old/conflicting Docker packages
+- Installs Docker CE using official Docker repository
+- Configures Docker service to start on boot
+- Verifies installation with test container
+- Supports both Ubuntu and Debian systems
+- Provides installation summary and status
 
 ## Server Groups
 
@@ -211,7 +230,13 @@ ansible postgres-1 -m setup
 
 ### Update Database Servers Only
 ```bash
+# Update all database servers
 ansible-playbook playbooks/system-update.yml --limit databases
+```
+
+### Install Docker on Development Servers
+```bash
+ansible-playbook playbooks/docker-setup.yml --limit development
 ```
 
 ### Update with Dry Run
@@ -232,6 +257,11 @@ ansible-playbook playbooks/system-update.yml --limit sentry-1
 ### Update by Datacenter
 ```bash
 ansible-playbook playbooks/system-update.yml --limit hetzner_nuremberg
+```
+
+### Setup Docker on Specific Server
+```bash
+ansible-playbook playbooks/docker-setup.yml --limit postgres-1
 ```
 
 ## Best Practices
@@ -259,8 +289,14 @@ ansible all -m ping
 # Update everything
 ansible-playbook playbooks/system-update.yml
 
+# Install Docker everywhere
+ansible-playbook playbooks/docker-setup.yml
+
 # Update just databases
 ansible-playbook playbooks/system-update.yml --limit databases
+
+# Install Docker on development servers only
+ansible-playbook playbooks/docker-setup.yml --limit development
 
 # Dry run on development servers
 ansible-playbook playbooks/system-update.yml --limit development --check

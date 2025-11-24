@@ -81,15 +81,16 @@ echo ""
 print_step "Available operations:"
 echo "1. Test connectivity (ping all hosts)"
 echo "2. Run system update (comprehensive system maintenance)"
-echo "3. Check what would be updated (dry run)"
-echo "4. Update specific host"
-echo "5. Update by server group"
-echo "6. Show inventory"
-echo "7. Exit"
+echo "3. Run Docker setup (install Docker if missing)"
+echo "4. Check what would be updated (dry run)"
+echo "5. Update specific host"
+echo "6. Update by server group"
+echo "7. Show inventory"
+echo "8. Exit"
 echo ""
 
 while true; do
-    read -p "Select an option [1-7]: " choice
+    read -p "Select an option [1-8]: " choice
     case $choice in
         1)
             print_step "Testing connectivity to all hosts..."
@@ -104,10 +105,14 @@ while true; do
             ansible-playbook playbooks/system-update.yml
             ;;
         3)
+            print_step "Running Docker setup..."
+            ansible-playbook playbooks/docker-setup.yml
+            ;;
+        4)
             print_step "Running dry run (check mode)..."
             ansible-playbook playbooks/system-update.yml --check --diff
             ;;
-        4)
+        5)
             print_step "Available hosts:"
             echo "- data-science-staging-1"
             echo "- dragonfly-db-1"
@@ -127,7 +132,7 @@ while true; do
                 print_warning "No hostname provided"
             fi
             ;;
-        5)
+        6)
             print_step "Available server groups:"
             echo "- databases (dragonfly-db-1, postgres-1, milvus-1)"
             echo "- development (data-science-staging-1, team-dev-server-1)"
@@ -142,18 +147,18 @@ while true; do
                 print_warning "No group name provided"
             fi
             ;;
-        6)
+        7)
             print_step "Current inventory:"
             echo "=================="
             cat inventory/hosts.yml
             echo "=================="
             ;;
-        7)
+        8)
             print_status "Goodbye!"
             exit 0
             ;;
         *)
-            print_warning "Invalid option. Please select 1-7."
+            print_warning "Invalid option. Please select 1-8."
             ;;
     esac
     echo ""
