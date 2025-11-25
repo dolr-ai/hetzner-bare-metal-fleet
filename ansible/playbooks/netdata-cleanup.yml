@@ -1,0 +1,68 @@
+---
+- name: Netdata Service Cleanup
+  hosts: all
+  gather_facts: true
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    netdata_service_path: /run/systemd/generator.late/netdata.service
+
+  tasks:
+    - name: Wait for system to be ready
+      wait_for_connection:
+        timeout: 60
+
+    - name: Check if netdata service file exists in systemd generator path
+      stat:
+        path: "{{ netdata_service_path }}"
+      register: netdata_service_file
+
+    - name: Display netdata service file status
+      debug:
+        msg: "Netdata service file {{ 'exists' if netdata_service_file.stat.exists else 'does not exist' }} at {{ netdata_service_path }}"
+
+    - name: Remove netdata service file from systemd generator path
+      file:
+        path: "{{ netdata_service_path }}"
+        state: absent
+      register: netdata_removal
+      when: netdata_service_file.stat.exists
+      notify: reload systemd
+
+    - name: Display removal result
+      debug:
+        msg: "Netdata service file removed from {{ netdata_service_path }}"
+      when:
+        - netdata_service_file.stat.exists
+        - netdata_removal is succeeded
+
+    - name: Check if netdata service is still known to systemd
+      systemd:
+        name: netdata
+        state: stopped
+      register: netdata_service_status
+      failed_when: false
+      changed_when: false
+
+    - name: Force systemd daemon reload if netdata service was removed
+      systemd:
+        daemon_reload: yes
+      when: netdata_service_file.stat.exists and netdata_removal is succeeded
+
+    - name: Verify netdata service is no longer failing
+      shell: systemctl --failed | grep netdata || true
+      register: failed_services_check
+      changed_when: false
+
+    - name: Display cleanup summary
+      debug:
+        msg: |
+          Netdata Cleanup Summary:
+          - Service file existed: {{ 'Yes' if netdata_service_file.stat.exists else 'No' }}
+          - Service file removed: {{ 'Yes' if (netdata_service_file.stat.exists and netdata_removal is succeeded) else 'No' }}
+          - Systemd reloaded: {{ 'Yes' if (netdata_service_file.stat.exists and netdata_removal is succeeded) else 'No' }}
+          - Failed services containing 'netdata': {{ failed_services_check.stdout_lines | length }}
+
+  handlers:
+    - name: reload systemd
+      systemd:
+        daemon_reload: yes

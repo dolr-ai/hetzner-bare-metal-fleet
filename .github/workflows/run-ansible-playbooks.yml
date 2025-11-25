@@ -1,4 +1,4 @@
-name: Fleet Management via Ansible
+name: Run Ansible Playbooks
 
 on:
   # Trigger on push to main branch
@@ -40,6 +40,11 @@ on:
         type: boolean
       run_system_update:
         description: "Run system updates and upgrades"
+        required: false
+        default: true
+        type: boolean
+      run_netdata_cleanup:
+        description: "Run netdata service cleanup"
         required: false
         default: true
         type: boolean
@@ -179,6 +184,26 @@ jobs:
             playbooks/system-update.yml \
             ${{ (inputs.enable_reboot == true || github.event_name == 'push' || github.event_name == 'schedule') && '-e enable_reboot=true' || '' }}
 
+      - name: Run netdata cleanup playbook (dry run)
+        if: ${{ inputs.dry_run == true && (inputs.run_netdata_cleanup == true || inputs.run_netdata_cleanup == null) }}
+        run: |
+          cd ansible
+          ansible-playbook \
+            --limit ${{ inputs.target_hosts || 'all' }} \
+            --check \
+            --diff \
+            -v \
+            playbooks/netdata-cleanup.yml
+
+      - name: Run netdata cleanup playbook
+        if: ${{ inputs.dry_run != true && (inputs.run_netdata_cleanup == true || inputs.run_netdata_cleanup == null || github.event_name == 'push' || github.event_name == 'schedule') }}
+        run: |
+          cd ansible
+          ansible-playbook \
+            --limit ${{ inputs.target_hosts || 'all' }} \
+            -v \
+            playbooks/netdata-cleanup.yml
+
       - name: Generate update summary
         if: always()
         run: |
@@ -188,6 +213,7 @@ jobs:
           echo "**SSH Security:** ${{ inputs.run_ssh_security || 'true (auto)' }}" >> $GITHUB_STEP_SUMMARY
           echo "**Docker Setup:** ${{ inputs.run_docker_setup || 'true (auto)' }}" >> $GITHUB_STEP_SUMMARY
           echo "**System Update:** ${{ inputs.run_system_update || 'true (auto)' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Netdata Cleanup:** ${{ inputs.run_netdata_cleanup || 'true (auto)' }}" >> $GITHUB_STEP_SUMMARY
           echo "**Dry Run:** ${{ inputs.dry_run || 'false' }}" >> $GITHUB_STEP_SUMMARY
           echo "**Enable Reboot:** ${{ inputs.enable_reboot || 'false' }}" >> $GITHUB_STEP_SUMMARY
           echo "**Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
