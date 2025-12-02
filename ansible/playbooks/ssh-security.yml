@@ -65,11 +65,42 @@
       when: root_authorized_keys_file.stat.exists
 
     - name: Display authorized SSH keys for root user
-      debug:
-        msg: |
-          Root User Authorized SSH Keys:
+      slurp:
+        src: /root/.ssh/authorized_keys
+      register: filtered_authorized_keys_content
+      when: root_authorized_keys_file.stat.exists
+
+    - name: Keep only allowed SSH keys for root user
+      copy:
+        dest: /root/.ssh/authorized_keys
+        content: |
           {% if root_authorized_keys_file.stat.exists %}
           {% for line in root_authorized_keys_content.content | b64decode | split('\n') %}
+          {% if
+            'github-actions@yral.com' in line
+            or 'saikatdas0790@gmail.com' in line
+          %}
+          {{ line }}
+          {% endif %}
+          {% endfor %}
+          {% endif %}
+        owner: root
+        group: root
+        mode: "0600"
+      when: root_authorized_keys_file.stat.exists
+
+    - name: Display authorized SSH keys for root user
+      slurp:
+        src: /root/.ssh/authorized_keys
+      register: filtered_authorized_keys_content
+      when: root_authorized_keys_file.stat.exists
+
+    - name: Show filtered authorized SSH keys for root user
+      debug:
+        msg: |
+          Root User Authorized SSH Keys (filtered):
+          {% if root_authorized_keys_file.stat.exists %}
+          {% for line in filtered_authorized_keys_content.content | b64decode | split('\n') %}
           {% if line.strip() and not line.strip().startswith('#') %}
           - {{ line.split()[-1] if line.split() | length > 2 else 'Key without comment' }}: {{ line.split()[0] }} {{ line.split()[1][:20] }}...
           {% endif %}
