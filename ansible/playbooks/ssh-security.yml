@@ -87,7 +87,10 @@
         owner: root
         group: root
         mode: "0600"
-      when: root_authorized_keys_file.stat.exists
+      when:
+        - root_authorized_keys_file.stat.exists
+        - inventory_hostname not in groups['development']
+        - inventory_hostname not in groups['staging']
 
     - name: Display authorized SSH keys for root user
       slurp:

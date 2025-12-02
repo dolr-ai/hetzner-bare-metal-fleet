@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       target_hosts:
-        description: "Target hosts (all, databases, development, infrastructure, applications, or specific host)"
+        description: "Target hosts (all, or specific host)"
         required: true
         default: "all"
         type: choice
