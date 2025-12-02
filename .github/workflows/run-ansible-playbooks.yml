@@ -14,11 +14,6 @@ on:
         default: "all"
         type: choice
         options:
-          - all
-          - databases
-          - development
-          - infrastructure
-          - applications
           - data-science-staging-1
           - dragonfly-db-1
           - github-action-runner-1
@@ -28,6 +23,7 @@ on:
           - storj-interface-1
           - team-dev-server-1
           - uptime-monitor-1
+          - low-traffic-1
       run_ssh_security:
         description: "Run SSH security audit and configuration"
         required: false
