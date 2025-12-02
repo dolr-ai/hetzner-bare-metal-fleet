@@ -87,12 +87,6 @@ nano /etc/ssh/sshd_config
 service ssh restart
 ```
 
-# fail2ban setup
-
-```bash
-apt install fail2ban -y;
-```
-
 # Setup user account
 
 - `su` into user
