@@ -84,17 +84,15 @@
         msg: |
           Existing /root/.ssh/authorized_keys on {{ inventory_hostname }}:
           --------------------------------------------------------------------------------
-          Algorithm           Comment                             Key prefix
-          --------------------------------------------------------------------------------
           {% if existing_authorized_keys | default('') | trim == '' %}
           <file exists but is empty>
           {% else %}
           {% for line in existing_authorized_keys.split('\n') if line | trim %}
           {% set parts = line.split() %}
-          {% set alg = parts[0] if parts | length > 0 else '' %}
+          {% set alg = parts[0] if parts | length > 0 else '(invalid)' %}
           {% set blob = parts[1] if parts | length > 1 else '' %}
-          {% set comment = (parts[2:] | join(' ')) if parts | length > 2 else '' %}
-          {{ alg | ljust(18) }} {{ (comment if comment != '' else '<no-comment>')[:35] | ljust(35) }} {{ (blob[:20] if blob else '') }}
+          {% set comment = (parts[2:] | join(' ')) if parts | length > 2 else '<no-comment>' %}
+          {{ alg }} | {{ comment[:40] }} | {{ blob[:24] }}...
           {% endfor %}
           {% endif %}
           --------------------------------------------------------------------------------
