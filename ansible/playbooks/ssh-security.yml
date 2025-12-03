@@ -1,7 +1,8 @@
 ---
-- name: SSH Security Configuration and Audit
+- name: SSH Security Configuration and Audit (canonical authorized_keys replace)
   hosts: all
   gather_facts: true
+  become: true
   vars:
     ansible_python_interpreter: /usr/bin/python3
 
@@ -15,7 +16,7 @@
         msg: "This playbook is designed for Debian/Ubuntu systems only"
       when: ansible_os_family != "Debian"
 
-    - name: Check SSH password authentication is disabled
+    - name: Ensure SSH password authentication is disabled
       lineinfile:
         path: /etc/ssh/sshd_config
         regexp: "^#?PasswordAuthentication"
@@ -23,8 +24,9 @@
         state: present
         backup: yes
       register: ssh_password_auth_check
+      notify: Restart ssh
 
-    - name: Check SSH public key authentication is enabled
+    - name: Ensure SSH public key authentication is enabled
       lineinfile:
         path: /etc/ssh/sshd_config
         regexp: "^#?PubkeyAuthentication"
@@ -32,18 +34,13 @@
         state: present
         backup: yes
       register: ssh_pubkey_auth_check
+      notify: Restart ssh
 
     - name: Verify SSH configuration syntax
       command: sshd -t
       register: ssh_config_test
       failed_when: ssh_config_test.rc != 0
       changed_when: false
-
-    - name: Restart SSH service if configuration changed
-      systemd:
-        name: ssh
-        state: restarted
-      when: ssh_password_auth_check.changed or ssh_pubkey_auth_check.changed
 
     - name: Display SSH security status
       debug:
@@ -58,72 +55,58 @@
         path: /root/.ssh/authorized_keys
       register: root_authorized_keys_file
 
-    - name: Display authorized SSH keys for root user
-      slurp:
-        src: /root/.ssh/authorized_keys
-      register: filtered_authorized_keys_content
-      when: root_authorized_keys_file.stat.exists
+    - name: Load canonical authorized_keys from repo (controller-side)
+      set_fact:
+        canonical_authorized_keys: "{{ lookup('file', playbook_dir + '/../files/authorized_keys') | default('') }}"
 
-    - name: Show filtered authorized SSH keys for root user
-      debug:
-        msg: |
-          Root User Authorized SSH Keys (filtered):
-          {% if root_authorized_keys_file.stat.exists %}
-          {% for line in filtered_authorized_keys_content.content | b64decode | split('\n') %}
-          {% if line.strip() and not line.strip().startswith('#') %}
-          - {{ line.split()[-1] if line.split() | length > 2 else 'Key without comment' }}: {{ line.split()[0] }} {{ line.split()[1][:20] }}...
-          {% endif %}
-          {% endfor %}
-          {% else %}
-          - No authorized_keys file found for root user
-          {% endif %}
-      when: root_authorized_keys_file.stat.exists or not root_authorized_keys_file.stat.exists
+    - name: Trim canonical content for safe use
+      set_fact:
+        canonical_trim: "{{ canonical_authorized_keys | default('') | trim }}"
 
-    - name: Read root user authorized SSH keys
-      slurp:
-        src: /root/.ssh/authorized_keys
-      register: root_authorized_keys_content
-      when: root_authorized_keys_file.stat.exists
-
-    - name: Keep only allowed SSH keys for root user
+    - name: Replace /root/.ssh/authorized_keys with canonical file when remote exists and canonical differs
       copy:
         dest: /root/.ssh/authorized_keys
-        content: |
-          {% if root_authorized_keys_file.stat.exists %}
-          {% for line in root_authorized_keys_content.content | b64decode | split('\n') %}
-          {% if
-            'github-actions@yral.com' in line
-            or 'saikatdas0790@gmail.com' in line
-          %}
-          {{ line }}
-          {% endif %}
-          {% endfor %}
-          {% endif %}
+        content: "{{ canonical_trim + '\\n' }}"
         owner: root
         group: root
         mode: "0600"
+        backup: yes
       when:
         - root_authorized_keys_file.stat.exists
-        - inventory_hostname not in groups['development']
-        - inventory_hostname not in groups['staging']
+        - canonical_trim != ''
+        - inventory_hostname not in groups.get('development', [])
+        - inventory_hostname not in groups.get('staging', [])
+      register: canonical_replace_result
 
-    - name: Display authorized SSH keys for root user
-      slurp:
-        src: /root/.ssh/authorized_keys
-      register: filtered_authorized_keys_content
-      when: root_authorized_keys_file.stat.exists
+    - name: Report canonical replacement outcome
+      debug:
+        msg: >-
+          {% if canonical_replace_result is defined and canonical_replace_result.changed %}
+            Replaced /root/.ssh/authorized_keys with canonical file (differences detected).
+          {% elif canonical_replace_result is defined %}
+            Canonical authorized_keys equals existing file; no changes made.
+          {% else %}
+            No replacement attempted (remote file missing or conditions not met).
+          {% endif %}
 
-    - name: Show filtered authorized SSH keys for root user
+    - name: Inform when canonical file is empty (no action taken)
+      debug:
+        msg: "Canonical authorized_keys file is empty; not overwriting /root/.ssh/authorized_keys."
+      when:
+        - root_authorized_keys_file.stat.exists
+        - canonical_trim == ''
+
+    - name: Inform when no existing authorized_keys found
       debug:
         msg: |
-          Root User Authorized SSH Keys (filtered):
-          {% if root_authorized_keys_file.stat.exists %}
-          {% for line in filtered_authorized_keys_content.content | b64decode | split('\n') %}
-          {% if line.strip() and not line.strip().startswith('#') %}
-          - {{ line.split()[-1] if line.split() | length > 2 else 'Key without comment' }}: {{ line.split()[0] }} {{ line.split()[1][:20] }}...
-          {% endif %}
-          {% endfor %}
-          {% else %}
-          - No authorized_keys file found for root user
-          {% endif %}
-      when: root_authorized_keys_file.stat.exists or not root_authorized_keys_file.stat.exists
+          No /root/.ssh/authorized_keys exists on this host.
+          Current policy is to NOT create the file automatically.
+          If you want to provision the canonical file when missing, enable that behavior explicitly.
+      when: not root_authorized_keys_file.stat.exists
+
+  handlers:
+    - name: Restart ssh
+      systemd:
+        name: ssh
+        state: restarted
+      listen: Restart ssh
