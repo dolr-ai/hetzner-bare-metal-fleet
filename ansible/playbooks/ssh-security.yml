@@ -82,16 +82,8 @@
     - name: Print existing authorized_keys content before replacing (when different)
       debug:
         msg: |
-          Existing /root/.ssh/authorized_keys on {{ inventory_hostname }} (decoded):
-          {% if existing_authorized_keys | length > 0 %}
-          {% for line in existing_authorized_keys.split('\n') %}
-          {% if line != '' %}
-          - {{ line }}
-          {% endif %}
-          {% endfor %}
-          {% else %}
-          - <file exists but is empty>
-          {% endif %}
+          Existing /root/.ssh/authorized_keys on {{ inventory_hostname }}:
+          {{ existing_authorized_keys | default('<file exists but is empty>') }}
       when: canonical_differs
 
     - name: Replace /root/.ssh/authorized_keys with canonical file when different
