@@ -88,8 +88,8 @@
 
     - name: Replace /root/.ssh/authorized_keys with canonical file when different
       copy:
+        src: "{{ playbook_dir + '/../files/authorized_keys' }}"
         dest: /root/.ssh/authorized_keys
-        content: "{{ canonical_authorized_keys | default('') }}"
         owner: root
         group: root
         mode: "0600"
