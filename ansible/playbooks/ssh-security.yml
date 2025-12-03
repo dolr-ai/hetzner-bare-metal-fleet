@@ -83,19 +83,9 @@
       debug:
         msg: |
           Existing /root/.ssh/authorized_keys on {{ inventory_hostname }}:
-          --------------------------------------------------------------------------------
-          {% if existing_authorized_keys | default('') | trim == '' %}
-          <file exists but is empty>
-          {% else %}
-          {% for line in existing_authorized_keys.split('\n') if line | trim %}
-          {% set parts = line.split() %}
-          {% set alg = parts[0] if parts | length > 0 else '(invalid)' %}
-          {% set blob = parts[1] if parts | length > 1 else '' %}
-          {% set comment = (parts[2:] | join(' ')) if parts | length > 2 else '<no-comment>' %}
-          {{ alg }} | {{ comment[:40] }} | {{ blob[:24] }}...
+          {% for line in existing_authorized_keys.split('\n') %}
+          {{ line }}
           {% endfor %}
-          {% endif %}
-          --------------------------------------------------------------------------------
       when: canonical_differs
 
     - name: Replace /root/.ssh/authorized_keys with canonical file when different
