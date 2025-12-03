@@ -1,8 +1,8 @@
 # installimage with swraid 0 and btrfs for the root
 
 ```bash
-PART btrfs.1    btrfs       all
-SUBVOL btrfs.1  @           /
+PART btrfs.1 btrfs all
+SUBVOL btrfs.1 @ /
 ```
 
 # update the system
