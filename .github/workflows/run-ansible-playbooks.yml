@@ -14,16 +14,17 @@ on:
         default: "all"
         type: choice
         options:
+          - clickhouse-shard-1-replica-1
           - data-science-staging-1
           - dragonfly-db-1
           - github-action-runner-1
+          - low-traffic-1
+          - low-traffic-2
           - milvus-1
-          - postgres-1
           - sentry-1
           - storj-interface-1
           - team-dev-server-1
           - uptime-monitor-1
-          - low-traffic-1
       run_ssh_security:
         description: "Run SSH security audit and configuration"
         required: false
