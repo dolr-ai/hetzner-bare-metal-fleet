@@ -58,10 +58,10 @@
         path: /root/.ssh/authorized_keys
       register: root_authorized_keys_file
 
-    - name: Read root user authorized SSH keys
+    - name: Display authorized SSH keys for root user
       slurp:
         src: /root/.ssh/authorized_keys
-      register: root_authorized_keys_content
+      register: filtered_authorized_keys_content
       when: root_authorized_keys_file.stat.exists
 
     - name: Show filtered authorized SSH keys for root user
@@ -78,6 +78,12 @@
           - No authorized_keys file found for root user
           {% endif %}
       when: root_authorized_keys_file.stat.exists or not root_authorized_keys_file.stat.exists
+
+    - name: Read root user authorized SSH keys
+      slurp:
+        src: /root/.ssh/authorized_keys
+      register: root_authorized_keys_content
+      when: root_authorized_keys_file.stat.exists
 
     - name: Keep only allowed SSH keys for root user
       copy:
