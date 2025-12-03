@@ -65,12 +65,15 @@
       set_fact:
         canonical_authorized_keys: "{{ lookup('file', playbook_dir + '/../files/authorized_keys') | default('') }}"
 
-    - name: Compute existing content and whether canonical differs
+    - name: Compute existing authorized_keys content (decoded)
       set_fact:
         existing_authorized_keys: "{{ (root_authorized_keys_raw.content | default('') | b64decode) if root_authorized_keys_file.stat.exists else '' }}"
+
+    - name: Determine whether canonical differs and replacement is allowed
+      set_fact:
         canonical_differs: >-
           {{ (root_authorized_keys_file.stat.exists and
-              (canonical_authorized_keys | default('') != existing_authorized_keys) and
+              (canonical_authorized_keys | default('') != (existing_authorized_keys | default(''))) and
               (canonical_authorized_keys | default('') != '') and
               (inventory_hostname not in groups.get('development', [])) and
               (inventory_hostname not in groups.get('staging', []))
