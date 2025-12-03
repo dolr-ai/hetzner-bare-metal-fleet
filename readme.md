@@ -19,7 +19,7 @@ apt autoremove -y;
 ```bash
 lsblk -f;
 df -h;
-fdisk -l /dev/sda /dev/sdb;
+fdisk -l;
 cat /proc/mdstat;
 btrfs filesystem show;
 # If previously mdadm was used, stop and remove arrays
@@ -27,12 +27,22 @@ mdadm --stop /dev/md0 /dev/md1 /dev/md2
 mdadm --zero-superblock /dev/sdb1 /dev/sdb2 /dev/sdb3;
 # blkdiscard /dev/sda -f;
 # dd if=/dev/zero of=/dev/sda bs=1M status=progress;
+
+# For SATA
 wipefs -a /dev/sdb;
-lsblk /dev/sdb;
-wipefs -a /dev/sdb2;
 parted /dev/sdb mklabel gpt;
-lsblk /dev/sdb;
 btrfs device add -f /dev/sdb /;
+btrfs filesystem show;
+btrfs balance start / --full-balance;
+btrfs filesystem show;
+df -h /;
+btrfs filesystem usage /;
+lsblk -f;
+
+# For NVMe
+wipefs -a /dev/nvme1n1;
+parted /dev/nvme1n1 mklabel gpt;
+btrfs device add -f /dev/nvme1n1 /;
 btrfs filesystem show;
 btrfs balance start / --full-balance;
 btrfs filesystem show;
