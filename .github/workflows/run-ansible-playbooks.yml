@@ -18,10 +18,8 @@ on:
           - clickhouse-keeper-1
           - clickhouse-keeper-2
           - clickhouse-keeper-3
-          - clickhouse-shard-1-replica-1
-          - clickhouse-shard-1-replica-2
-          - clickhouse-shard-2-replica-1
-          - clickhouse-shard-2-replica-2
+          - clickhouse-replica-1
+          - clickhouse-replica-2
           - data-science-staging-1
           - dragonfly-db-1
           - github-action-runner-1
