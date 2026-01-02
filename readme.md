@@ -117,3 +117,9 @@ visudo
 ```bash
 hostnamectl set-hostname <new-hostname>
 ```
+
+# 1 liner install
+
+```bash
+IP_ADDRESS="" ssh -o "StrictHostKeyChecking=no" -o "UserKnownHostsFile=/dev/null" root@$IP_ADDRESS "MACHINE_HOSTNAME='kubernetes-host-1' DRIVE_TO_USE='nvme0n1' bash -c 'curl -fsSL https://raw.githubusercontent.com/dolr-ai/hetzner-bare-metal-fleet/refs/heads/main/init.sh | bash'; sleep 10; reboot;"
+```
