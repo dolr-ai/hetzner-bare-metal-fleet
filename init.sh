@@ -1,8 +1,105 @@
-mdadm --stop /dev/md/*
+#!/bin/bash
 
-# for SATA drives:
-wipefs -fa /dev/sd*
-# for NVMe drives:
-wipefs -fa /dev/nvme*n1
+set -e
 
-installimage -a -n $MACHINE_HOSTNAME -r no -l 0 -p /boot:ext3:1024M,btrfs.1:btrfs:all,btrfs.1:@:/ -d $DRIVE_TO_USE -f yes -t yes -i /root/images/Ubuntu-2404-noble-amd64-base.tar.gz
+# Check if we're in Hetzner rescue system
+if ! command -v installimage &> /dev/null; then
+    echo "ERROR: installimage command not found!"
+    echo "This script must be run from Hetzner's rescue system."
+    echo ""
+    echo "To boot into rescue mode:"
+    echo "1. Go to Hetzner Robot panel"
+    echo "2. Select your server"
+    echo "3. Click 'Rescue' tab"
+    echo "4. Activate Linux rescue system"
+    echo "5. Reset/reboot your server"
+    echo "6. SSH into the rescue system and run this script"
+    exit 1
+fi
+
+# Validate required environment variables
+if [ -z "$MACHINE_HOSTNAME" ]; then
+    echo "ERROR: MACHINE_HOSTNAME environment variable is not set"
+    exit 1
+fi
+
+if [ -z "$DRIVE_TO_USE" ]; then
+    echo "ERROR: DRIVE_TO_USE environment variable is not set"
+    echo "Example: DRIVE_TO_USE='nvme0n1' or DRIVE_TO_USE='sda'"
+    exit 1
+fi
+
+echo "=========================================="
+echo "Hetzner Bare Metal Installation Script"
+echo "=========================================="
+echo "Hostname: $MACHINE_HOSTNAME"
+echo "Drive: /dev/$DRIVE_TO_USE"
+echo "=========================================="
+
+# Stop any existing mdadm arrays if they exist
+echo "Stopping existing RAID arrays..."
+if ls /dev/md* 2>/dev/null | grep -q .; then
+    for md in /dev/md*; do
+        if [ -b "$md" ]; then
+            mdadm --stop "$md" 2>/dev/null || true
+        fi
+    done
+else
+    echo "No mdadm arrays found to stop"
+fi
+
+# Wipe filesystems based on drive type
+echo "Wiping existing filesystems..."
+if [[ "$DRIVE_TO_USE" == nvme* ]]; then
+    # For NVMe drives
+    if ls /dev/nvme*n1 2>/dev/null | grep -q .; then
+        for drive in /dev/nvme*n1; do
+            if [ -b "$drive" ]; then
+                echo "Wiping $drive"
+                wipefs -fa "$drive" 2>/dev/null || true
+            fi
+        done
+    else
+        echo "No NVMe drives found"
+    fi
+else
+    # For SATA drives
+    if ls /dev/sd* 2>/dev/null | grep -q .; then
+        for drive in /dev/sd?; do
+            if [ -b "$drive" ]; then
+                echo "Wiping $drive"
+                wipefs -fa "$drive" 2>/dev/null || true
+            fi
+        done
+    else
+        echo "No SATA drives found"
+    fi
+fi
+
+# Verify the target drive exists
+if [ ! -b "/dev/$DRIVE_TO_USE" ]; then
+    echo "ERROR: Drive /dev/$DRIVE_TO_USE does not exist!"
+    echo "Available drives:"
+    lsblk -d -o NAME,SIZE,TYPE | grep disk
+    exit 1
+fi
+
+echo "=========================================="
+echo "Starting installimage..."
+echo "=========================================="
+
+# Run installimage
+installimage -a \
+    -n "$MACHINE_HOSTNAME" \
+    -r no \
+    -l 0 \
+    -p /boot:ext3:1024M,btrfs.1:btrfs:all,btrfs.1:@:/ \
+    -d "$DRIVE_TO_USE" \
+    -f yes \
+    -t yes \
+    -i /root/images/Ubuntu-2404-noble-amd64-base.tar.gz
+
+echo "=========================================="
+echo "Installation complete!"
+echo "The system will reboot shortly..."
+echo "=========================================="

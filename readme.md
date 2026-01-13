@@ -1,4 +1,80 @@
-# installimage with swraid 0 and btrfs for the root
+## Troubleshooting
+
+### "installimage: command not found"
+
+This error means you're not in the rescue system. You must:
+1. Activate rescue mode in Hetzner Robot
+2. Reboot the server
+3. SSH into the rescue system (not the regular OS)
+
+### "Drive /dev/nvme0n1 does not exist"
+
+Check available drives with `lsblk -d` and adjust the `DRIVE_TO_USE` variable accordingly.
+
+### Common Drive Names
+
+- NVMe drives: `nvme0n1`, `nvme1n1`
+- SATA drives: `sda`, `sdb`
+
+## One-liner Install (from rescue system)
+
+```bash
+IP_ADDRESS="138.201.128.108"
+ssh -o "StrictHostKeyChecking=no" -o "UserKnownHostsFile=/dev/null" root@$IP_ADDRESS \
+  "MACHINE_HOSTNAME='kubernetes-host-1' DRIVE_TO_USE='nvme0n1' bash -c 'curl -fsSL https://raw.githubusercontent.com/dolr-ai/hetzner-bare-metal-fleet/refs/heads/main/init.sh | bash'; sleep 10; reboot;"
+```
+
+# Hetzner Bare Metal Fleet Setup
+
+This repository contains scripts to automate the setup of Hetzner bare metal servers with btrfs and Docker.
+
+## Prerequisites
+
+1. A Hetzner dedicated server
+2. Access to Hetzner Robot panel
+3. SSH access
+
+## Installation Steps
+
+### 1. Boot into Rescue System
+
+**IMPORTANT:** The `init.sh` script MUST be run from Hetzner's rescue system, not from a running OS.
+
+1. Log into [Hetzner Robot](https://robot.hetzner.com/)
+2. Select your server
+3. Go to the "Rescue" tab
+4. Activate the Linux rescue system (64-bit)
+5. Note the root password provided
+6. Go to the "Reset" tab and trigger a hardware reset (or use the "Send CTRL+ALT+DEL" option)
+7. Wait 1-2 minutes for the server to boot into rescue mode
+
+### 2. Run the Installation Script
+
+```bash
+IP_ADDRESS="138.201.128.108"
+HOSTNAME="kubernetes-host-1"
+DRIVE="nvme0n1"  # or "sda" for SATA drives
+
+ssh -o "StrictHostKeyChecking=no" -o "UserKnownHostsFile=/dev/null" root@$IP_ADDRESS \
+  "MACHINE_HOSTNAME='$HOSTNAME' DRIVE_TO_USE='$DRIVE' bash -c 'curl -fsSL https://raw.githubusercontent.com/dolr-ai/hetzner-bare-metal-fleet/refs/heads/main/init.sh | bash'; sleep 10; reboot;"
+```
+
+**Note:** Use the rescue system password when prompted.
+
+### 3. Wait for Reboot
+
+After the script completes, the server will reboot into the newly installed Ubuntu system. Wait 2-3 minutes before attempting to SSH again.
+
+## What the Installation Script Does
+
+- Stops existing RAID arrays
+- Wipes filesystem signatures from drives
+- Installs Ubuntu 24.04 with:
+  - No software RAID (RAID 0)
+  - Single btrfs partition with @ subvolume for root
+  - 1GB /boot partition (ext3)
+
+### installimage Configuration
 
 ```bash
 PART btrfs.1 btrfs all
@@ -116,10 +192,4 @@ visudo
 
 ```bash
 hostnamectl set-hostname <new-hostname>
-```
-
-# 1 liner install
-
-```bash
-IP_ADDRESS="" ssh -o "StrictHostKeyChecking=no" -o "UserKnownHostsFile=/dev/null" root@$IP_ADDRESS "MACHINE_HOSTNAME='kubernetes-host-1' DRIVE_TO_USE='nvme0n1' bash -c 'curl -fsSL https://raw.githubusercontent.com/dolr-ai/hetzner-bare-metal-fleet/refs/heads/main/init.sh | bash'; sleep 10; reboot;"
 ```
