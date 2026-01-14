@@ -52,10 +52,10 @@ This repository contains scripts to automate the setup of Hetzner bare metal ser
 
 ```bash
 IP_ADDRESS="138.201.128.108"
-HOSTNAME="kubernetes-host-1"
+HOSTNAME="airflow-1"
 DRIVE="nvme0n1"  # or "sda" for SATA drives
 ssh -o "StrictHostKeyChecking=no" -o "UserKnownHostsFile=/dev/null" root@$IP_ADDRESS \
-  "MACHINE_HOSTNAME='$HOSTNAME' DRIVE_TO_USE='$DRIVE' bash -c 'curl -fsSL https://raw.githubusercontent.com/dolr-ai/hetzner-bare-metal-fleet/refs/heads/main/init.sh | bash'; sleep 10; reboot;"
+  "MACHINE_HOSTNAME='$HOSTNAME' DRIVE_TO_USE='$DRIVE' bash -c 'curl -fsSL https://raw.githubusercontent.com/dolr-ai/hetzner-bare-metal-fleet/refs/heads/main/init.sh | bash'"
 ```
 
 **Note:** Use the rescue system password when prompted.

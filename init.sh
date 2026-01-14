@@ -3,7 +3,9 @@
 set -e
 
 # Check if we're in Hetzner rescue system
-if ! command -v installimage &> /dev/null; then
+# installimage is typically an alias pointing to /root/.oldroot/nfs/install/installimage
+# We need to check for the actual file since aliases don't work in non-interactive shells
+if [ ! -f /root/.oldroot/nfs/install/installimage ]; then
     echo "ERROR: installimage command not found!"
     echo "This script must be run from Hetzner's rescue system."
     echo ""
@@ -88,8 +90,8 @@ echo "=========================================="
 echo "Starting installimage..."
 echo "=========================================="
 
-# Run installimage
-installimage -a \
+# Run installimage with full path (alias doesn't work in non-interactive shells)
+/root/.oldroot/nfs/install/installimage -a \
     -n "$MACHINE_HOSTNAME" \
     -r no \
     -l 0 \
