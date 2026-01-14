@@ -1,0 +1,130 @@
+---
+- name: Provision New Bare Metal Servers
+  hosts: all
+  gather_facts: false
+  vars:
+    drive_to_use: "nvme0n1" # Default, override with -e drive_to_use=sda
+    provision_marker: "/root/.provisioned"
+
+  tasks:
+    - name: Check if server is already provisioned
+      ansible.builtin.raw: "test -f {{ provision_marker }} && echo 'provisioned' || echo 'not_provisioned'"
+      register: provision_check
+      changed_when: false
+      failed_when: false
+      ignore_errors: true
+
+    - name: Skip already provisioned hosts
+      ansible.builtin.meta: end_host
+      when: provision_check.stdout is defined and 'provisioned' in provision_check.stdout
+
+    - name: Check if in rescue system
+      ansible.builtin.raw: "test -f /root/.oldroot/nfs/install/installimage && echo 'rescue' || echo 'not_rescue'"
+      register: rescue_check
+      changed_when: false
+      failed_when: false
+
+    - name: Fail if not in rescue system
+      ansible.builtin.fail:
+        msg: |
+          Server {{ inventory_hostname }} is not in rescue mode.
+          Please activate rescue mode in Hetzner Robot:
+          1. Go to https://robot.hetzner.com/
+          2. Select server {{ inventory_hostname }}
+          3. Go to 'Rescue' tab
+          4. Activate Linux rescue system (64-bit)
+          5. Reset the server
+          6. Wait for rescue system to boot
+          7. Re-run this playbook
+      when: rescue_check.stdout is not defined or 'rescue' not in rescue_check.stdout
+
+    - name: Display provisioning info
+      ansible.builtin.debug:
+        msg: |
+          Provisioning {{ inventory_hostname }}
+          Hostname: {{ inventory_hostname }}
+          Drive: {{ drive_to_use }}
+          This will take approximately 10-15 minutes.
+
+    - name: Run bare metal provisioning script
+      ansible.builtin.shell: |
+        MACHINE_HOSTNAME='{{ inventory_hostname }}' \
+        DRIVE_TO_USE='{{ drive_to_use }}' \
+        bash -c 'curl -fsSL https://raw.githubusercontent.com/dolr-ai/hetzner-bare-metal-fleet/refs/heads/main/init.sh | bash'
+      register: provision_result
+      async: 1200 # 20 minutes timeout
+      poll: 30
+      changed_when: true
+
+    - name: Wait for server to reboot
+      ansible.builtin.wait_for_connection:
+        delay: 60
+        timeout: 300
+        sleep: 10
+      when: provision_result is succeeded
+
+    - name: Gather facts after reboot
+      ansible.builtin.setup:
+
+    - name: Create provision marker
+      ansible.builtin.file:
+        path: "{{ provision_marker }}"
+        state: touch
+        mode: "0644"
+
+    - name: Display post-installation message
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          {{ inventory_hostname }} provisioned successfully!
+          ========================================
+
+          NEXT STEPS:
+          1. Add second drive to btrfs RAID 0:
+             {% if 'nvme' in drive_to_use %}
+             wipefs -a /dev/nvme1n1
+             btrfs device add -f /dev/nvme1n1 /
+             {% else %}
+             wipefs -a /dev/sdb
+             btrfs device add -f /dev/sdb /
+             {% endif %}
+             btrfs balance start -dconvert=raid0 -mconvert=raid0 /
+
+          2. Run standard fleet management playbooks:
+             - SSH security configuration
+             - Docker installation
+             - System updates
+
+          These will be run automatically in the next step.
+
+- name: Run initial fleet management on newly provisioned servers
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install essential packages
+      ansible.builtin.apt:
+        name:
+          - curl
+          - wget
+          - git
+          - vim
+          - htop
+          - net-tools
+          - ca-certificates
+        state: present
+
+- name: Import system update playbook
+  ansible.builtin.import_playbook: system-update.yml
+
+- name: Import SSH security playbook
+  ansible.builtin.import_playbook: ssh-security.yml
+
+- name: Import Docker setup playbook
+  ansible.builtin.import_playbook: docker-setup.yml
