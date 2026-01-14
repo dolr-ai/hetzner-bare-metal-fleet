@@ -15,7 +15,7 @@
 
     - name: Skip already provisioned hosts
       ansible.builtin.meta: end_host
-      when: provision_check.stdout is defined and 'provisioned' in provision_check.stdout
+      when: provision_check.stdout is defined and provision_check.stdout | trim == 'provisioned'
 
     - name: Check if in rescue system
       ansible.builtin.raw: "test -f /root/.oldroot/nfs/install/installimage && echo 'rescue' || echo 'not_rescue'"
