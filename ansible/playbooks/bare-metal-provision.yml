@@ -152,18 +152,6 @@
         update_cache: yes
         cache_valid_time: 3600
 
-    - name: Install essential packages
-      ansible.builtin.apt:
-        name:
-          - curl
-          - wget
-          - git
-          - vim
-          - htop
-          - net-tools
-          - ca-certificates
-        state: present
-
 - name: Import system update playbook
   ansible.builtin.import_playbook: system-update.yml
 
