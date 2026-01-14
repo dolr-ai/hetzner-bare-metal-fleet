@@ -19,9 +19,9 @@ Check available drives with `lsblk -d` and adjust the `DRIVE_TO_USE` variable ac
 ## One-liner Install (from rescue system)
 
 ```bash
-IP_ADDRESS="138.201.128.108";
+IP_ADDRESS="138.201.128.108"
 ssh -o "StrictHostKeyChecking=no" -o "UserKnownHostsFile=/dev/null" root@$IP_ADDRESS \
-  "MACHINE_HOSTNAME='kubernetes-host-1'; DRIVE_TO_USE='nvme0n1'; bash -c 'curl -fsSL https://raw.githubusercontent.com/dolr-ai/hetzner-bare-metal-fleet/refs/heads/main/init.sh | bash'; sleep 10; reboot;"
+  "MACHINE_HOSTNAME='airflow-1'; DRIVE_TO_USE='nvme0n1'; bash -c 'curl -fsSL https://raw.githubusercontent.com/dolr-ai/hetzner-bare-metal-fleet/refs/heads/main/init.sh | bash';"
 ```
 
 # Hetzner Bare Metal Fleet Setup

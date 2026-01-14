@@ -31,16 +31,8 @@ if [ -z "$DRIVE_TO_USE" ]; then
     exit 1
 fi
 
-# Determine second drive based on first drive
-if [[ "$DRIVE_TO_USE" == nvme* ]]; then
-    # NVMe: nvme0n1 and nvme1n1
-    DRIVE1="nvme0n1"
-    DRIVE2="nvme1n1"
-elif [[ "$DRIVE_TO_USE" == sd* ]]; then
-    # SATA: sda and sdb
-    DRIVE1="sda"
-    DRIVE2="sdb"
-else
+# Validate drive type
+if [[ "$DRIVE_TO_USE" != nvme* ]] && [[ "$DRIVE_TO_USE" != sd* ]]; then
     echo "ERROR: Unsupported drive type: $DRIVE_TO_USE"
     echo "Supported: nvme0n1, nvme1n1, sda, sdb"
     exit 1
@@ -50,9 +42,8 @@ echo "=========================================="
 echo "Hetzner Bare Metal Installation Script"
 echo "=========================================="
 echo "Hostname: $MACHINE_HOSTNAME"
-echo "Drive 1: /dev/$DRIVE1"
-echo "Drive 2: /dev/$DRIVE2"
-echo "Filesystem: btrfs RAID 0 (full capacity)"
+echo "Installation Drive: /dev/$DRIVE_TO_USE"
+echo "Filesystem: btrfs (second drive added post-install)"
 echo "=========================================="
 
 # Stop any existing mdadm arrays if they exist
@@ -95,16 +86,9 @@ else
     fi
 fi
 
-# Verify both target drives exist
-if [ ! -b "/dev/$DRIVE1" ]; then
-    echo "ERROR: Drive /dev/$DRIVE1 does not exist!"
-    echo "Available drives:"
-    lsblk -d -o NAME,SIZE,TYPE | grep disk
-    exit 1
-fi
-
-if [ ! -b "/dev/$DRIVE2" ]; then
-    echo "ERROR: Drive /dev/$DRIVE2 does not exist!"
+# Verify the target drive exists
+if [ ! -b "/dev/$DRIVE_TO_USE" ]; then
+    echo "ERROR: Drive /dev/$DRIVE_TO_USE does not exist!"
     echo "Available drives:"
     lsblk -d -o NAME,SIZE,TYPE | grep disk
     exit 1
@@ -115,13 +99,13 @@ echo "Starting installimage..."
 echo "=========================================="
 
 # Run installimage with full path (alias doesn't work in non-interactive shells)
-# Install on first drive only - second drive will be added after first boot
+# Install on single drive - second drive will be added after first boot
 /root/.oldroot/nfs/install/installimage -a \
     -n "$MACHINE_HOSTNAME" \
     -r no \
     -l 0 \
     -p /:btrfs:all \
-    -d "$DRIVE1" \
+    -d "$DRIVE_TO_USE" \
     -f yes \
     -t yes \
     -i /root/images/Ubuntu-2404-noble-amd64-base.tar.gz
