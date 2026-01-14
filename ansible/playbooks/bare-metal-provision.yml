@@ -72,30 +72,74 @@
         state: touch
         mode: "0644"
 
-    - name: Display post-installation message
+    - name: Get current btrfs devices
+      ansible.builtin.shell: "btrfs filesystem show / | grep -oP '/dev/\\S+' | head -1"
+      register: current_device
+      changed_when: false
+
+    - name: Determine second drive to add
+      ansible.builtin.set_fact:
+        second_drive: "{{ '/dev/nvme1n1' if 'nvme0n1' in current_device.stdout else '/dev/sdb' if 'sda' in current_device.stdout else '' }}"
+
+    - name: List all available block devices
+      ansible.builtin.shell: "lsblk -dn -o NAME,SIZE,TYPE | grep disk"
+      register: available_drives
+      changed_when: false
+
+    - name: Display drive information
+      ansible.builtin.debug:
+        msg: |
+          Current btrfs device: {{ current_device.stdout }}
+          Second drive to add: {{ second_drive }}
+          Available drives:
+          {{ available_drives.stdout }}
+
+    - name: Check if second drive exists
+      ansible.builtin.stat:
+        path: "{{ second_drive }}"
+      register: second_drive_stat
+      when: second_drive != ''
+
+    - name: Wipe second drive
+      ansible.builtin.command: "wipefs -a {{ second_drive }}"
+      when: second_drive != '' and second_drive_stat.stat.exists
+      changed_when: true
+
+    - name: Add second drive to btrfs filesystem
+      ansible.builtin.command: "btrfs device add -f {{ second_drive }} /"
+      when: second_drive != '' and second_drive_stat.stat.exists
+      changed_when: true
+      register: add_device_result
+
+    - name: Convert to btrfs RAID 0
+      ansible.builtin.shell: "btrfs balance start -dconvert=raid0 -mconvert=raid0 /"
+      when: add_device_result is succeeded
+      async: 3600 # Balance can take a while
+      poll: 10
+      changed_when: true
+      register: balance_result
+
+    - name: Get btrfs filesystem status
+      ansible.builtin.shell: |
+        echo "=== Filesystem Show ==="
+        btrfs filesystem show /
+        echo ""
+        echo "=== Filesystem Usage ==="
+        btrfs filesystem usage /
+        echo ""
+        echo "=== Block Devices ==="
+        lsblk -f
+      register: btrfs_status
+      changed_when: false
+
+    - name: Display btrfs RAID 0 setup results
       ansible.builtin.debug:
         msg: |
           ========================================
-          {{ inventory_hostname }} provisioned successfully!
+          {{ inventory_hostname }} - btrfs RAID 0 Setup Complete!
           ========================================
-
-          NEXT STEPS:
-          1. Add second drive to btrfs RAID 0:
-             {% if 'nvme' in drive_to_use %}
-             wipefs -a /dev/nvme1n1
-             btrfs device add -f /dev/nvme1n1 /
-             {% else %}
-             wipefs -a /dev/sdb
-             btrfs device add -f /dev/sdb /
-             {% endif %}
-             btrfs balance start -dconvert=raid0 -mconvert=raid0 /
-
-          2. Run standard fleet management playbooks:
-             - SSH security configuration
-             - Docker installation
-             - System updates
-
-          These will be run automatically in the next step.
+          {{ btrfs_status.stdout }}
+          ========================================
 
 - name: Run initial fleet management on newly provisioned servers
   hosts: all
