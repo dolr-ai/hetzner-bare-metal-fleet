@@ -155,4 +155,4 @@ echo "Installation complete!"
 echo "The system will reboot shortly..."
 echo "=========================================="
 
-reboot
+# reboot
