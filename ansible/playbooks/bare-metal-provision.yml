@@ -80,14 +80,20 @@
         state: touch
         mode: "0644"
 
-    - name: Get current btrfs devices
-      ansible.builtin.shell: "btrfs filesystem show / | grep -oP '/dev/\\S+' | head -1"
-      register: current_device
+    - name: Get current btrfs device from root filesystem
+      ansible.builtin.shell: "df / | tail -1 | awk '{print $1}'"
+      register: root_device
+      changed_when: false
+
+    - name: Get base device name (strip partition)
+      ansible.builtin.shell: "lsblk -no PKNAME {{ root_device.stdout }} | head -1"
+      register: base_device
       changed_when: false
 
     - name: Determine second drive to add
       ansible.builtin.set_fact:
-        second_drive: "{{ '/dev/nvme1n1' if 'nvme0n1' in current_device.stdout else '/dev/sdb' if 'sda' in current_device.stdout else '' }}"
+        current_device: "{{ base_device.stdout | trim }}"
+        second_drive: "{{ '/dev/nvme1n1' if 'nvme0n1' in base_device.stdout else '/dev/sdb' if 'sda' in base_device.stdout else '' }}"
 
     - name: List all available block devices
       ansible.builtin.shell: "lsblk -dn -o NAME,SIZE,TYPE | grep disk"
@@ -97,7 +103,8 @@
     - name: Display drive information
       ansible.builtin.debug:
         msg: |
-          Current btrfs device: {{ current_device.stdout }}
+          Root device: {{ root_device.stdout }}
+          Base device: {{ current_device }}
           Second drive to add: {{ second_drive }}
           Available drives:
           {{ available_drives.stdout }}
@@ -110,18 +117,21 @@
 
     - name: Wipe second drive
       ansible.builtin.command: "wipefs -a {{ second_drive }}"
-      when: second_drive != '' and second_drive_stat.stat.exists
+      when: second_drive != '' and second_drive_stat.stat.exists | default(false)
       changed_when: true
 
     - name: Add second drive to btrfs filesystem
       ansible.builtin.command: "btrfs device add -f {{ second_drive }} /"
-      when: second_drive != '' and second_drive_stat.stat.exists
+      when: second_drive != '' and second_drive_stat.stat.exists | default(false)
       changed_when: true
       register: add_device_result
 
     - name: Convert to btrfs RAID 0
       ansible.builtin.shell: "btrfs balance start -dconvert=raid0 -mconvert=raid0 /"
-      when: add_device_result is succeeded
+      when:
+        - second_drive != ''
+        - second_drive_stat.stat.exists | default(false)
+        - add_device_result is changed
       async: 3600 # Balance can take a while
       poll: 10
       changed_when: true
