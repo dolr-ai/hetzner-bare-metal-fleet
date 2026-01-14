@@ -115,7 +115,7 @@ echo "Starting installimage..."
 echo "=========================================="
 
 # Run installimage with full path (alias doesn't work in non-interactive shells)
-# Install on first drive only, we'll add the second drive to btrfs afterwards
+# Install on first drive only - second drive will be added after first boot
 /root/.oldroot/nfs/install/installimage -a \
     -n "$MACHINE_HOSTNAME" \
     -r no \
@@ -127,32 +127,22 @@ echo "=========================================="
     -i /root/images/Ubuntu-2404-noble-amd64-base.tar.gz
 
 echo "=========================================="
-echo "Adding second drive to btrfs RAID 0..."
-echo "=========================================="
-
-# Mount the newly installed system
-mount /dev/md0 /mnt 2>/dev/null || mount /dev/${DRIVE1}1 /mnt 2>/dev/null || mount /dev/${DRIVE1}p1 /mnt
-
-# Wipe the second drive and add it to btrfs
-wipefs -fa "/dev/$DRIVE2" 2>/dev/null || true
-
-# Add second drive to btrfs filesystem with RAID 0 (stripe) profile
-btrfs device add -f "/dev/$DRIVE2" /mnt
-
-# Convert to RAID 0 (stripe) for both data and metadata
-echo "Converting to RAID 0 profile..."
-btrfs balance start -dconvert=raid0 -mconvert=raid0 /mnt
-
-echo "Checking filesystem..."
-btrfs filesystem show /mnt
-btrfs filesystem usage /mnt
-
-# Unmount
-umount /mnt
-
-echo "=========================================="
 echo "Installation complete!"
-echo "The system will reboot shortly..."
+echo "=========================================="
+echo "IMPORTANT: After the system reboots, add the second drive with:"
+echo ""
+if [[ "$DRIVE_TO_USE" == nvme* ]]; then
+    echo "  wipefs -a /dev/nvme1n1"
+    echo "  btrfs device add -f /dev/nvme1n1 /"
+    echo "  btrfs balance start -dconvert=raid0 -mconvert=raid0 /"
+else
+    echo "  wipefs -a /dev/sdb"
+    echo "  btrfs device add -f /dev/sdb /"
+    echo "  btrfs balance start -dconvert=raid0 -mconvert=raid0 /"
+fi
+echo ""
+echo "Rebooting in 5 seconds..."
 echo "=========================================="
 
-# reboot
+sleep 5
+reboot

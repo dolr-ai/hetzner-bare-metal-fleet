@@ -64,21 +64,40 @@ ssh -o "StrictHostKeyChecking=no" -o "UserKnownHostsFile=/dev/null" root@$IP_ADD
 
 After the script completes, the server will reboot into the newly installed Ubuntu system. Wait 2-3 minutes before attempting to SSH again.
 
+### 4. Add Second Drive to btrfs RAID 0 (Post-Installation)
+
+After the system boots, SSH into the new system and add the second drive:
+
+**For NVMe drives:**
+```bash
+wipefs -a /dev/nvme1n1
+btrfs device add -f /dev/nvme1n1 /
+btrfs balance start -dconvert=raid0 -mconvert=raid0 /
+btrfs filesystem show /
+btrfs filesystem usage /
+```
+
+**For SATA drives:**
+```bash
+wipefs -a /dev/sdb
+btrfs device add -f /dev/sdb /
+btrfs balance start -dconvert=raid0 -mconvert=raid0 /
+btrfs filesystem show /
+btrfs filesystem usage /
+```
+
+This converts your single-drive btrfs filesystem to a RAID 0 configuration across both drives, giving you the full combined capacity with improved performance.
+
 ## What the Installation Script Does
 
 - Stops existing RAID arrays
 - Wipes filesystem signatures from drives
-- Installs Ubuntu 24.04 with:
-  - No software RAID (RAID 0)
-  - Single btrfs partition with @ subvolume for root
-  - 1GB /boot partition (ext3)
+- Installs Ubuntu 24.04 on the **first drive only** with:
+  - Single btrfs partition using entire drive for root (/)
+  - No mdadm software RAID
+  - No separate /boot partition (GRUB2 boots directly from btrfs)
 
-### installimage Configuration
-
-```bash
-PART btrfs.1 btrfs all
-SUBVOL btrfs.1 @ /
-```
+**Note:** The second drive is intentionally left unused during installation. You'll add it to create a btrfs RAID 0 array after the first boot (see step 4 above).
 
 # update the system
 
