@@ -109,3 +109,8 @@ echo "=========================================="
     -f yes \
     -t yes \
     -i /root/images/Ubuntu-2404-noble-amd64-base.tar.gz
+
+echo "=========================================="
+echo "Installation complete!"
+echo "Server will be rebooted by Ansible..."
+echo "=========================================="

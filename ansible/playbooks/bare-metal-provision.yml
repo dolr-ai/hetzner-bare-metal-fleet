@@ -64,12 +64,44 @@
       poll: 30
       changed_when: true
 
-    - name: Wait for server to reboot
-      ansible.builtin.wait_for_connection:
-        delay: 60
-        timeout: 300
-        sleep: 10
+    - name: Reboot server into installed system
+      ansible.builtin.reboot:
+        msg: "Rebooting into installed Ubuntu system"
+        connect_timeout: 5
+        reboot_timeout: 300
+        pre_reboot_delay: 3
+        post_reboot_delay: 30
+        test_command: uptime
       when: provision_result is succeeded
+
+    - name: Verify system booted into installed OS (not rescue mode)
+      ansible.builtin.shell: |
+        if [ -f /root/.oldroot/nfs/install/installimage ]; then
+          echo "rescue"
+        else
+          echo "installed"
+        fi
+      register: boot_mode_check
+      changed_when: false
+
+    - name: Fail if still in rescue mode
+      ansible.builtin.fail:
+        msg: |
+          ERROR: Server is still in rescue mode after reboot!
+          The installimage completed but the server did not boot into the installed OS.
+
+          Manual steps required:
+          1. Go to Hetzner Robot panel (https://robot.hetzner.com)
+          2. Find server {{ inventory_hostname }}
+          3. Click 'Rescue' tab
+          4. Click 'Deactivate rescue system'
+          5. Reboot the server
+          6. Re-run this workflow
+      when: boot_mode_check.stdout | trim == 'rescue'
+
+    - name: Display boot status
+      ansible.builtin.debug:
+        msg: "✓ Server successfully booted into installed Ubuntu system"
 
     - name: Gather facts after reboot
       ansible.builtin.setup:
