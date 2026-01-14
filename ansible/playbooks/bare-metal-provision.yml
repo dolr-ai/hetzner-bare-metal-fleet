@@ -130,24 +130,24 @@
       register: base_device
       changed_when: false
 
+    - name: List all available block devices
+      ansible.builtin.shell: 'lsblk -dn -o NAME,TYPE | grep disk | awk ''{print "/dev/" $1}'''
+      register: available_drives
+      changed_when: false
+
     - name: Determine second drive to add
       ansible.builtin.set_fact:
         current_device: "{{ base_device.stdout | trim }}"
-        second_drive: "{{ '/dev/nvme1n1' if 'nvme0n1' in base_device.stdout else '/dev/sdb' if 'sda' in base_device.stdout else '' }}"
-
-    - name: List all available block devices
-      ansible.builtin.shell: "lsblk -dn -o NAME,SIZE,TYPE | grep disk"
-      register: available_drives
-      changed_when: false
+        all_drives: "{{ available_drives.stdout_lines }}"
+        second_drive: "{{ (available_drives.stdout_lines | reject('search', base_device.stdout | trim | basename) | list | first) | default('') }}"
 
     - name: Display drive information
       ansible.builtin.debug:
         msg: |
           Root device: {{ root_device.stdout }}
           Base device: {{ current_device }}
-          Second drive to add: {{ second_drive }}
-          Available drives:
-          {{ available_drives.stdout }}
+          All available drives: {{ all_drives | join(', ') }}
+          Second drive to add: {{ second_drive if second_drive != '' else 'None (single disk system)' }}
 
     - name: Check if second drive exists
       ansible.builtin.stat:
