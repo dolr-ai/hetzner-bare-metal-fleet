@@ -3,7 +3,6 @@
   hosts: all
   gather_facts: false
   vars:
-    drive_to_use: "nvme0n1" # Default, override with -e drive_to_use=sda
     provision_marker: "/root/.provisioned"
 
   tasks:
@@ -38,12 +37,21 @@
           7. Re-run this playbook
       when: rescue_check.stdout is not defined or 'rescue' not in rescue_check.stdout
 
+    - name: Detect available drives
+      ansible.builtin.raw: "lsblk -dn -o NAME,TYPE | grep disk | awk '{print $1}' | head -1"
+      register: detected_drive
+      changed_when: false
+
+    - name: Set drive_to_use variable
+      ansible.builtin.set_fact:
+        drive_to_use: "{{ detected_drive.stdout | trim }}"
+
     - name: Display provisioning info
       ansible.builtin.debug:
         msg: |
           Provisioning {{ inventory_hostname }}
           Hostname: {{ inventory_hostname }}
-          Drive: {{ drive_to_use }}
+          Drive: {{ drive_to_use }} (auto-detected)
           This will take approximately 10-15 minutes.
 
     - name: Run bare metal provisioning script
