@@ -23,7 +23,7 @@ IP_ADDRESS="138.201.128.108"
 HOSTNAME="airflow-1"
 DRIVE="nvme0n1"  # or "sda" for SATA drives
 ssh -o "StrictHostKeyChecking=no" -o "UserKnownHostsFile=/dev/null" root@$IP_ADDRESS \
-  "MACHINE_HOSTNAME='$HOSTNAME' DRIVE_TO_USE='$DRIVE' bash -c 'curl -fsSL https://raw.githubusercontent.com/dolr-ai/hetzner-bare-metal-fleet/refs/heads/main/init.sh | bash'"
+  "curl -fsSL https://raw.githubusercontent.com/dolr-ai/hetzner-bare-metal-fleet/refs/heads/main/init.sh | MACHINE_HOSTNAME='$HOSTNAME' DRIVE_TO_USE='$DRIVE' bash && sleep 5 && reboot"
 ```
 
 # Hetzner Bare Metal Fleet Setup
@@ -57,7 +57,7 @@ IP_ADDRESS="138.201.128.108"
 HOSTNAME="airflow-1"
 DRIVE="nvme0n1"  # or "sda" for SATA drives
 ssh -o "StrictHostKeyChecking=no" -o "UserKnownHostsFile=/dev/null" root@$IP_ADDRESS \
-  "MACHINE_HOSTNAME='$HOSTNAME' DRIVE_TO_USE='$DRIVE' bash -c 'curl -fsSL https://raw.githubusercontent.com/dolr-ai/hetzner-bare-metal-fleet/refs/heads/main/init.sh | bash'; sleep 5; reboot"
+  "curl -fsSL https://raw.githubusercontent.com/dolr-ai/hetzner-bare-metal-fleet/refs/heads/main/init.sh | MACHINE_HOSTNAME='$HOSTNAME' DRIVE_TO_USE='$DRIVE' bash && sleep 5 && reboot"
 ```
 
 **Note:** Use the rescue system password when prompted.
