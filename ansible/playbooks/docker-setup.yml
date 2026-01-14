@@ -67,7 +67,7 @@
       shell: |
         if [ -f /etc/os-release ]; then
           . /etc/os-release
-          echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}"
+          echo "${VERSION_CODENAME:-$UBUNTU_CODENAME}"
         else
           lsb_release -cs
         fi
