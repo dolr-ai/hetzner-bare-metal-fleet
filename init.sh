@@ -38,13 +38,9 @@ if [[ "$DRIVE_TO_USE" != nvme* ]] && [[ "$DRIVE_TO_USE" != sd* ]]; then
     exit 1
 fi
 
-echo "=========================================="
 echo "Hetzner Bare Metal Installation Script"
-echo "=========================================="
 echo "Hostname: $MACHINE_HOSTNAME"
 echo "Installation Drive: /dev/$DRIVE_TO_USE"
-echo "Filesystem: btrfs (second drive added post-install)"
-echo "=========================================="
 
 # Stop any existing mdadm arrays if they exist
 echo "Stopping existing RAID arrays..."
@@ -94,9 +90,7 @@ if [ ! -b "/dev/$DRIVE_TO_USE" ]; then
     exit 1
 fi
 
-echo "=========================================="
 echo "Starting installimage..."
-echo "=========================================="
 
 # Run installimage with full path (alias doesn't work in non-interactive shells)
 # Install on single drive - second drive will be added after first boot
@@ -110,7 +104,4 @@ echo "=========================================="
     -t yes \
     -i /root/images/Ubuntu-2404-noble-amd64-base.tar.gz
 
-echo "=========================================="
 echo "Installation complete!"
-echo "Server will be rebooted by Ansible..."
-echo "=========================================="
