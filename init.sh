@@ -31,11 +31,28 @@ if [ -z "$DRIVE_TO_USE" ]; then
     exit 1
 fi
 
+# Determine second drive based on first drive
+if [[ "$DRIVE_TO_USE" == nvme* ]]; then
+    # NVMe: nvme0n1 and nvme1n1
+    DRIVE1="nvme0n1"
+    DRIVE2="nvme1n1"
+elif [[ "$DRIVE_TO_USE" == sd* ]]; then
+    # SATA: sda and sdb
+    DRIVE1="sda"
+    DRIVE2="sdb"
+else
+    echo "ERROR: Unsupported drive type: $DRIVE_TO_USE"
+    echo "Supported: nvme0n1, nvme1n1, sda, sdb"
+    exit 1
+fi
+
 echo "=========================================="
 echo "Hetzner Bare Metal Installation Script"
 echo "=========================================="
 echo "Hostname: $MACHINE_HOSTNAME"
-echo "Drive: /dev/$DRIVE_TO_USE"
+echo "Drive 1: /dev/$DRIVE1"
+echo "Drive 2: /dev/$DRIVE2"
+echo "Filesystem: btrfs RAID 0 (full capacity)"
 echo "=========================================="
 
 # Stop any existing mdadm arrays if they exist
@@ -78,9 +95,16 @@ else
     fi
 fi
 
-# Verify the target drive exists
-if [ ! -b "/dev/$DRIVE_TO_USE" ]; then
-    echo "ERROR: Drive /dev/$DRIVE_TO_USE does not exist!"
+# Verify both target drives exist
+if [ ! -b "/dev/$DRIVE1" ]; then
+    echo "ERROR: Drive /dev/$DRIVE1 does not exist!"
+    echo "Available drives:"
+    lsblk -d -o NAME,SIZE,TYPE | grep disk
+    exit 1
+fi
+
+if [ ! -b "/dev/$DRIVE2" ]; then
+    echo "ERROR: Drive /dev/$DRIVE2 does not exist!"
     echo "Available drives:"
     lsblk -d -o NAME,SIZE,TYPE | grep disk
     exit 1
@@ -91,17 +115,44 @@ echo "Starting installimage..."
 echo "=========================================="
 
 # Run installimage with full path (alias doesn't work in non-interactive shells)
+# Install on first drive only, we'll add the second drive to btrfs afterwards
 /root/.oldroot/nfs/install/installimage -a \
     -n "$MACHINE_HOSTNAME" \
     -r no \
     -l 0 \
     -p /:btrfs:all \
-    -d "$DRIVE_TO_USE" \
+    -d "$DRIVE1" \
     -f yes \
     -t yes \
     -i /root/images/Ubuntu-2404-noble-amd64-base.tar.gz
 
 echo "=========================================="
+echo "Adding second drive to btrfs RAID 0..."
+echo "=========================================="
+
+# Mount the newly installed system
+mount /dev/md0 /mnt 2>/dev/null || mount /dev/${DRIVE1}1 /mnt 2>/dev/null || mount /dev/${DRIVE1}p1 /mnt
+
+# Wipe the second drive and add it to btrfs
+wipefs -fa "/dev/$DRIVE2" 2>/dev/null || true
+
+# Add second drive to btrfs filesystem with RAID 0 (stripe) profile
+btrfs device add -f "/dev/$DRIVE2" /mnt
+
+# Convert to RAID 0 (stripe) for both data and metadata
+echo "Converting to RAID 0 profile..."
+btrfs balance start -dconvert=raid0 -mconvert=raid0 /mnt
+
+echo "Checking filesystem..."
+btrfs filesystem show /mnt
+btrfs filesystem usage /mnt
+
+# Unmount
+umount /mnt
+
+echo "=========================================="
 echo "Installation complete!"
 echo "The system will reboot shortly..."
 echo "=========================================="
+
+reboot
