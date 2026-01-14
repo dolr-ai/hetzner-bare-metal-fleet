@@ -56,9 +56,9 @@
 
     - name: Run bare metal provisioning script
       ansible.builtin.shell: |
-        MACHINE_HOSTNAME='{{ inventory_hostname }}' \
-        DRIVE_TO_USE='{{ drive_to_use }}' \
-        bash -c 'curl -fsSL https://raw.githubusercontent.com/dolr-ai/hetzner-bare-metal-fleet/refs/heads/main/init.sh | bash'
+        export MACHINE_HOSTNAME='{{ inventory_hostname }}'
+        export DRIVE_TO_USE='{{ drive_to_use }}'
+        curl -fsSL https://raw.githubusercontent.com/dolr-ai/hetzner-bare-metal-fleet/refs/heads/main/init.sh | bash
       register: provision_result
       async: 1200 # 20 minutes timeout
       poll: 30
