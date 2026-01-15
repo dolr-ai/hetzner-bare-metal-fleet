@@ -170,20 +170,27 @@ jobs:
               custom_list = [k.strip() for k in custom_keys.split(',') if k.strip()]
               key_list.extend(custom_list)
 
-          # Add keys to payload
-          payload['authorized_key'] = key_list
+          # Add keys to payload - Hetzner API expects multiple authorized_key[] parameters
           print(f"Adding {len(key_list)} SSH key(s) to rescue system")
           print(f"Keys: github-actions, saikatdas" + (f", {additional_keys}" if additional_keys != "none" else "") + (f", custom keys" if custom_keys else ""))
 
           print(f"Activating rescue mode for {server_ip}...")
           print(f"OS: {rescue_os}, Arch: {arch}")
 
-          # Make API request
+          # Make API request - send authorized_key[] as multiple form parameters
           try:
+              # Build form data with multiple authorized_key[] parameters
+              form_data = [
+                  ('os', rescue_os),
+                  ('arch', arch)
+              ]
+              for key in key_list:
+                  form_data.append(('authorized_key[]', key))
+              
               response = requests.post(
                   api_url,
                   auth=HTTPBasicAuth(api_user, api_password),
-                  data=payload
+                  data=form_data
               )
               
               response.raise_for_status()
