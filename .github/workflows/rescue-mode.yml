@@ -1,0 +1,291 @@
+name: Hetzner Rescue Mode
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_host:
+        description: "Target host to put into rescue mode"
+        required: true
+        type: string
+      rescue_os:
+        description: "Rescue OS type"
+        required: true
+        default: "linux"
+        type: choice
+        options:
+          - linux
+          - linuxold
+          - freebsd
+      arch:
+        description: "Architecture"
+        required: true
+        default: "64"
+        type: choice
+        options:
+          - "64"
+          - "32"
+      auto_reboot:
+        description: "Automatically reboot server after activating rescue mode"
+        required: false
+        default: true
+        type: boolean
+
+env:
+  ANSIBLE_HOST_KEY_CHECKING: False
+  ANSIBLE_FORCE_COLOR: True
+
+jobs:
+  activate-rescue:
+    name: Activate Rescue Mode
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install pyyaml requests
+
+      - name: Get server IP from inventory
+        id: get-ip
+        run: |
+          python3 << 'EOF'
+          import yaml
+          import os
+
+          with open('ansible/inventory/hosts.yml', 'r') as f:
+              inventory = yaml.safe_load(f)
+
+          hostname = "${{ github.event.inputs.target_host }}"
+          hosts = inventory.get('all', {}).get('children', {}).get('bare_metal', {}).get('hosts', {})
+
+          if hostname not in hosts:
+              print(f"Error: Host {hostname} not found in inventory")
+              exit(1)
+
+          host_vars = hosts[hostname]
+          ansible_host = host_vars.get('ansible_host')
+          server_id = host_vars.get('hetzner_server_id')
+
+          if not ansible_host:
+              print(f"Error: ansible_host not found for {hostname}")
+              exit(1)
+
+          print(f"Found IP: {ansible_host}")
+
+          # Output to GitHub Actions
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"server_ip={ansible_host}\n")
+              if server_id:
+                  f.write(f"server_id={server_id}\n")
+          EOF
+
+      - name: Activate rescue mode via Hetzner API
+        id: activate-rescue
+        env:
+          HETZNER_API_USER: ${{ secrets.HETZNER_ROBOT_USER }}
+          HETZNER_API_PASSWORD: ${{ secrets.HETZNER_ROBOT_PASSWORD }}
+        run: |
+          python3 << 'EOF'
+          import requests
+          import json
+          import os
+          import sys
+          from requests.auth import HTTPBasicAuth
+
+          # Get credentials from environment
+          api_user = os.environ.get('HETZNER_API_USER')
+          api_password = os.environ.get('HETZNER_API_PASSWORD')
+          server_ip = "${{ steps.get-ip.outputs.server_ip }}"
+          rescue_os = "${{ github.event.inputs.rescue_os }}"
+          arch = "${{ github.event.inputs.arch }}"
+
+          if not api_user or not api_password:
+              print("Error: HETZNER_ROBOT_USER and HETZNER_ROBOT_PASSWORD secrets must be set")
+              sys.exit(1)
+
+          # Hetzner Robot API endpoint
+          api_url = f"https://robot-ws.your-server.de/boot/{server_ip}/rescue"
+
+          # Prepare the request payload
+          payload = {
+              "os": rescue_os,
+              "arch": arch
+          }
+
+          print(f"Activating rescue mode for {server_ip}...")
+          print(f"OS: {rescue_os}, Arch: {arch}")
+
+          # Make API request
+          try:
+              response = requests.post(
+                  api_url,
+                  auth=HTTPBasicAuth(api_user, api_password),
+                  data=payload
+              )
+              
+              response.raise_for_status()
+              result = response.json()
+              
+              # Extract rescue password
+              rescue_password = result.get('rescue', {}).get('password')
+              
+              if rescue_password:
+                  print(f"✅ Rescue mode activated successfully!")
+                  print(f"Server IP: {server_ip}")
+                  
+                  # Mask the password in logs but save it for job summary
+                  print(f"::add-mask::{rescue_password}")
+                  
+                  # Output to GitHub Actions (will be masked)
+                  with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                      f.write(f"rescue_password={rescue_password}\n")
+                      f.write(f"success=true\n")
+                  
+                  print("\n⚠️  IMPORTANT: Save the rescue password from the job summary!")
+              else:
+                  print("❌ Failed to get rescue password from API response")
+                  print(f"Response: {json.dumps(result, indent=2)}")
+                  sys.exit(1)
+                  
+          except requests.exceptions.RequestException as e:
+              print(f"❌ API request failed: {e}")
+              if hasattr(e.response, 'text'):
+                  print(f"Response: {e.response.text}")
+              sys.exit(1)
+          EOF
+
+      - name: Reboot server via Hetzner API
+        if: github.event.inputs.auto_reboot == 'true'
+        env:
+          HETZNER_API_USER: ${{ secrets.HETZNER_ROBOT_USER }}
+          HETZNER_API_PASSWORD: ${{ secrets.HETZNER_ROBOT_PASSWORD }}
+        run: |
+          python3 << 'EOF'
+          import requests
+          import time
+          import os
+          import sys
+          from requests.auth import HTTPBasicAuth
+
+          api_user = os.environ.get('HETZNER_API_USER')
+          api_password = os.environ.get('HETZNER_API_PASSWORD')
+          server_ip = "${{ steps.get-ip.outputs.server_ip }}"
+
+          api_url = f"https://robot-ws.your-server.de/reset/{server_ip}"
+
+          print(f"Triggering hardware reset for {server_ip}...")
+
+          try:
+              response = requests.post(
+                  api_url,
+                  auth=HTTPBasicAuth(api_user, api_password),
+                  data={"type": "hw"}
+              )
+              
+              response.raise_for_status()
+              print("✅ Hardware reset triggered successfully!")
+              print("Server will reboot into rescue mode...")
+              
+          except requests.exceptions.RequestException as e:
+              print(f"❌ Reset request failed: {e}")
+              if hasattr(e.response, 'text'):
+                  print(f"Response: {e.response.text}")
+              sys.exit(1)
+          EOF
+
+      - name: Wait for server to boot into rescue
+        if: github.event.inputs.auto_reboot == 'true'
+        run: |
+          echo "⏳ Waiting 120 seconds for server to boot into rescue mode..."
+          sleep 120
+
+      - name: Test SSH connectivity to rescue system
+        if: github.event.inputs.auto_reboot == 'true'
+        env:
+          RESCUE_PASSWORD: ${{ steps.activate-rescue.outputs.rescue_password }}
+        run: |
+          server_ip="${{ steps.get-ip.outputs.server_ip }}"
+
+          echo "Testing SSH connectivity to rescue system..."
+
+          # Install sshpass for password authentication
+          sudo apt-get update && sudo apt-get install -y sshpass
+
+          # Try to connect (with retries)
+          max_attempts=5
+          attempt=1
+
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt/$max_attempts..."
+            
+            if sshpass -p "$RESCUE_PASSWORD" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@$server_ip "echo 'Connected to rescue system'; uname -a"; then
+              echo "✅ Successfully connected to rescue system!"
+              exit 0
+            fi
+            
+            echo "Connection failed, waiting 30 seconds..."
+            sleep 30
+            attempt=$((attempt + 1))
+          done
+
+          echo "❌ Failed to connect after $max_attempts attempts"
+          exit 1
+
+      - name: Create job summary
+        if: always()
+        env:
+          RESCUE_PASSWORD: ${{ steps.activate-rescue.outputs.rescue_password }}
+        run: |
+          cat << 'SUMMARY' >> $GITHUB_STEP_SUMMARY
+          ## Rescue Mode Activation
+
+          **Target Host:** ${{ github.event.inputs.target_host }}
+          **Server IP:** ${{ steps.get-ip.outputs.server_ip }}
+          **Rescue OS:** ${{ github.event.inputs.rescue_os }}
+          **Architecture:** ${{ github.event.inputs.arch }}
+          **Auto Reboot:** ${{ github.event.inputs.auto_reboot }}
+
+          SUMMARY
+
+          if [ "${{ steps.activate-rescue.outputs.success }}" == "true" ]; then
+            cat << SUMMARY >> $GITHUB_STEP_SUMMARY
+          ### ✅ Status: Success
+
+          **Rescue Password:** \`$RESCUE_PASSWORD\`
+
+          ⚠️ **SAVE THIS PASSWORD!** You will need it to SSH into the rescue system.
+
+          ### Next Steps
+
+          SSH into the rescue system:
+          \`\`\`bash
+          ssh root@${{ steps.get-ip.outputs.server_ip }}
+          # Use the password above when prompted
+          \`\`\`
+
+          Run the provisioning script:
+          \`\`\`bash
+          HOSTNAME="${{ github.event.inputs.target_host }}"
+          DRIVE="nvme0n1"  # or "sda" for SATA drives
+
+          curl -fsSL https://raw.githubusercontent.com/dolr-ai/hetzner-bare-metal-fleet/refs/heads/main/init.sh | MACHINE_HOSTNAME="\$HOSTNAME" DRIVE_TO_USE="\$DRIVE" bash
+
+          # After installation completes, reboot
+          reboot
+          \`\`\`
+          SUMMARY
+          else
+            cat << SUMMARY >> $GITHUB_STEP_SUMMARY
+          ### ❌ Status: Failed
+
+          Check the logs above for error details.
+          SUMMARY
+          fi
