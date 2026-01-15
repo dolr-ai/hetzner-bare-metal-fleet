@@ -166,8 +166,8 @@
       changed_when: true
       register: add_device_result
 
-    - name: Convert to btrfs RAID 0
-      ansible.builtin.shell: "btrfs balance start -dconvert=raid0 -mconvert=raid0 /"
+    - name: Balance btrfs filesystem
+      ansible.builtin.shell: "btrfs balance start / --full-balance"
       when:
         - second_drive != ''
         - second_drive_stat.stat.exists | default(false)
