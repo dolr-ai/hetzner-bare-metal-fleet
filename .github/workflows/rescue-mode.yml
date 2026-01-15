@@ -29,6 +29,23 @@ on:
         required: false
         default: true
         type: boolean
+      additional_ssh_keys:
+        description: "Additional SSH keys to add (github-actions and saikatdas always included)"
+        required: false
+        default: "none"
+        type: choice
+        options:
+          - none
+          - joel@gobazzinga.io
+          - jay@gobazzinga.io
+          - kevin@gobazzinga.io
+          - ravi@gobazzinga.io
+          - naitik@gobazzinga.io
+          - all
+      custom_ssh_keys:
+        description: "Custom SSH key fingerprints (comma-separated, optional)"
+        required: false
+        type: string
 
 env:
   ANSIBLE_HOST_KEY_CHECKING: False
@@ -106,6 +123,8 @@ jobs:
           server_ip = "${{ steps.get-ip.outputs.server_ip }}"
           rescue_os = "${{ github.event.inputs.rescue_os }}"
           arch = "${{ github.event.inputs.arch }}"
+          additional_keys = "${{ github.event.inputs.additional_ssh_keys }}"
+          custom_keys = "${{ github.event.inputs.custom_ssh_keys }}"
 
           if not api_user or not api_password:
               print("Error: HETZNER_ROBOT_USER and HETZNER_ROBOT_PASSWORD secrets must be set")
@@ -119,6 +138,42 @@ jobs:
               "os": rescue_os,
               "arch": arch
           }
+
+          # Define SSH key mapping
+          ssh_keys_map = {
+              "github-actions": "07:dc:bf:1d:ed:27:cc:fc:28:bf:ae:37:41:29:0b:d4",
+              "saikatdas": "14:dc:61:45:5b:a3:46:c0:1d:62:ed:18:74:c0:11:59",
+              "joel@gobazzinga.io": "8d:1b:99:c8:bf:ca:6a:8a:57:1b:39:4d:4c:1b:64:3d",
+              "jay@gobazzinga.io": "2b:c8:8f:8f:b9:a1:37:e5:aa:5e:88:f9:46:a1:ff:89",
+              "kevin@gobazzinga.io": "87:90:71:9a:04:6a:ca:4f:9f:bf:ca:67:a5:5b:81:97",
+              "ravi@gobazzinga.io": "20:5f:d7:02:75:a4:e9:58:f0:28:28:3d:b7:fe:3c:cd",
+              "naitik@gobazzinga.io": "3d:7e:fc:35:f2:9b:4b:90:b4:98:66:06:3d:cc:c3:b6"
+          }
+
+          # Always include default keys
+          key_list = [
+              ssh_keys_map["github-actions"],
+              ssh_keys_map["saikatdas"]
+          ]
+
+          # Add additional keys based on selection
+          if additional_keys == "all":
+              for key_name in ["joel@gobazzinga.io", "jay@gobazzinga.io", "kevin@gobazzinga.io", 
+                              "ravi@gobazzinga.io", "naitik@gobazzinga.io"]:
+                  key_list.append(ssh_keys_map[key_name])
+          elif additional_keys != "none":
+              if additional_keys in ssh_keys_map:
+                  key_list.append(ssh_keys_map[additional_keys])
+
+          # Add custom keys if provided
+          if custom_keys:
+              custom_list = [k.strip() for k in custom_keys.split(',') if k.strip()]
+              key_list.extend(custom_list)
+
+          # Add keys to payload
+          payload['authorized_key'] = key_list
+          print(f"Adding {len(key_list)} SSH key(s) to rescue system")
+          print(f"Keys: github-actions, saikatdas" + (f", {additional_keys}" if additional_keys != "none" else "") + (f", custom keys" if custom_keys else ""))
 
           print(f"Activating rescue mode for {server_ip}...")
           print(f"OS: {rescue_os}, Arch: {arch}")
