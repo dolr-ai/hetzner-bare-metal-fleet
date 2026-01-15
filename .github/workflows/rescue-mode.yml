@@ -130,52 +130,86 @@ jobs:
               print("Error: HETZNER_ROBOT_USER and HETZNER_ROBOT_PASSWORD secrets must be set")
               sys.exit(1)
 
-          # Hetzner Robot API endpoint
-          api_url = f"https://robot-ws.your-server.de/boot/{server_ip}/rescue"
+          # First, fetch all SSH keys from Hetzner to get valid fingerprints
+          print("Fetching SSH keys from Hetzner API...")
+          keys_url = "https://robot-ws.your-server.de/key"
 
-          # Prepare the request payload
-          payload = {
-              "os": rescue_os,
-              "arch": arch
-          }
+          try:
+              keys_response = requests.get(
+                  keys_url,
+                  auth=HTTPBasicAuth(api_user, api_password)
+              )
+              keys_response.raise_for_status()
+              keys_data = keys_response.json()
+              
+              # Build a mapping of key names to fingerprints
+              hetzner_keys = {}
+              for key_entry in keys_data:
+                  key_info = key_entry.get('key', {})
+                  name = key_info.get('name', '')
+                  fingerprint = key_info.get('fingerprint', '')
+                  if name and fingerprint:
+                      hetzner_keys[name.lower()] = fingerprint
+                      # Also try matching by email in name
+                      if '@' in name:
+                          email = name.lower()
+                          hetzner_keys[email] = fingerprint
+              
+              print(f"Found {len(hetzner_keys)} keys in Hetzner: {list(hetzner_keys.keys())}")
+              
+          except requests.exceptions.RequestException as e:
+              print(f"Warning: Failed to fetch SSH keys from Hetzner: {e}")
+              hetzner_keys = {}
 
-          # Define SSH key mapping
+          # Define SSH key mapping - try to match with Hetzner keys
           ssh_keys_map = {
-              "github-actions": "07:dc:bf:1d:ed:27:cc:fc:28:bf:ae:37:41:29:0b:d4",
-              "saikatdas": "14:dc:61:45:5b:a3:46:c0:1d:62:ed:18:74:c0:11:59",
-              "joel@gobazzinga.io": "8d:1b:99:c8:bf:ca:6a:8a:57:1b:39:4d:4c:1b:64:3d",
-              "jay@gobazzinga.io": "2b:c8:8f:8f:b9:a1:37:e5:aa:5e:88:f9:46:a1:ff:89",
-              "kevin@gobazzinga.io": "87:90:71:9a:04:6a:ca:4f:9f:bf:ca:67:a5:5b:81:97",
-              "ravi@gobazzinga.io": "20:5f:d7:02:75:a4:e9:58:f0:28:28:3d:b7:fe:3c:cd",
-              "naitik@gobazzinga.io": "3d:7e:fc:35:f2:9b:4b:90:b4:98:66:06:3d:cc:c3:b6"
+              "github-actions": "github-actions@yral.com",
+              "saikatdas": "saikatdas0790@gmail.com",
+              "joel@gobazzinga.io": "joel@gobazzinga.io",
+              "jay@gobazzinga.io": "jay@gobazzinga.io",
+              "kevin@gobazzinga.io": "kevin@gobazzinga.io",
+              "ravi@gobazzinga.io": "ravi@gobazzinga.io",
+              "naitik@gobazzinga.io": "naitik@gobazzinga.io"
           }
 
-          # Always include default keys
-          key_list = [
-              ssh_keys_map["github-actions"],
-              ssh_keys_map["saikatdas"]
-          ]
+          # Build list of fingerprints to use
+          key_list = []
+
+          # Always try to include default keys
+          for key_name in ["github-actions", "saikatdas"]:
+              email = ssh_keys_map[key_name]
+              if email in hetzner_keys:
+                  key_list.append(hetzner_keys[email])
+                  print(f"Added {key_name} ({email}): {hetzner_keys[email]}")
+              else:
+                  print(f"Warning: {key_name} ({email}) not found in Hetzner keys")
 
           # Add additional keys based on selection
           if additional_keys == "all":
-              for key_name in ["joel@gobazzinga.io", "jay@gobazzinga.io", "kevin@gobazzinga.io", 
-                              "ravi@gobazzinga.io", "naitik@gobazzinga.io"]:
-                  key_list.append(ssh_keys_map[key_name])
+              for email in ["joel@gobazzinga.io", "jay@gobazzinga.io", "kevin@gobazzinga.io", 
+                          "ravi@gobazzinga.io", "naitik@gobazzinga.io"]:
+                  if email in hetzner_keys:
+                      key_list.append(hetzner_keys[email])
+                      print(f"Added {email}: {hetzner_keys[email]}")
           elif additional_keys != "none":
-              if additional_keys in ssh_keys_map:
-                  key_list.append(ssh_keys_map[additional_keys])
+              email = additional_keys
+              if email in hetzner_keys:
+                  key_list.append(hetzner_keys[email])
+                  print(f"Added {email}: {hetzner_keys[email]}")
 
-          # Add custom keys if provided
+          # Add custom keys if provided (assuming these are fingerprints)
           if custom_keys:
               custom_list = [k.strip() for k in custom_keys.split(',') if k.strip()]
               key_list.extend(custom_list)
+              print(f"Added {len(custom_list)} custom key(s)")
+
+          # Hetzner Robot API endpoint
+          api_url = f"https://robot-ws.your-server.de/boot/{server_ip}/rescue"
 
           # Add keys to payload - Hetzner API expects multiple authorized_key[] parameters
-          print(f"Adding {len(key_list)} SSH key(s) to rescue system")
-          print(f"Keys: github-actions, saikatdas" + (f", {additional_keys}" if additional_keys != "none" else "") + (f", custom keys" if custom_keys else ""))
-
-          print(f"Activating rescue mode for {server_ip}...")
+          print(f"\nActivating rescue mode for {server_ip}...")
           print(f"OS: {rescue_os}, Arch: {arch}")
+          print(f"Total keys to add: {len(key_list)}")
 
           # Make API request - send authorized_key[] as multiple form parameters
           try:
