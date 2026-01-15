@@ -104,6 +104,27 @@ jobs:
           cd ansible
           ansible ${{ inputs.target_hosts || 'all' }} -m ping -v
 
+      - name: Run system update playbook (dry run)
+        if: ${{ inputs.dry_run == true && (inputs.run_system_update == true || inputs.run_system_update == null) }}
+        run: |
+          cd ansible
+          ansible-playbook \
+            --limit ${{ inputs.target_hosts || 'all' }} \
+            --check \
+            --diff \
+            -v \
+            playbooks/system-update.yml
+
+      - name: Run system update playbook
+        if: ${{ inputs.dry_run != true && (inputs.run_system_update == true || inputs.run_system_update == null || github.event_name == 'push' || github.event_name == 'schedule') }}
+        run: |
+          cd ansible
+          ansible-playbook \
+            --limit ${{ inputs.target_hosts || 'all' }} \
+            -v \
+            playbooks/system-update.yml \
+            ${{ (inputs.enable_reboot == true || github.event_name == 'push' || github.event_name == 'schedule') && '-e enable_reboot=true' || '' }}
+
       - name: Run SSH security playbook (dry run)
         if: ${{ inputs.dry_run == true && (inputs.run_ssh_security == true || inputs.run_ssh_security == null) }}
         run: |
@@ -143,27 +164,6 @@ jobs:
             --limit ${{ inputs.target_hosts || 'all' }} \
             -v \
             playbooks/docker-setup.yml
-
-      - name: Run system update playbook (dry run)
-        if: ${{ inputs.dry_run == true && (inputs.run_system_update == true || inputs.run_system_update == null) }}
-        run: |
-          cd ansible
-          ansible-playbook \
-            --limit ${{ inputs.target_hosts || 'all' }} \
-            --check \
-            --diff \
-            -v \
-            playbooks/system-update.yml
-
-      - name: Run system update playbook
-        if: ${{ inputs.dry_run != true && (inputs.run_system_update == true || inputs.run_system_update == null || github.event_name == 'push' || github.event_name == 'schedule') }}
-        run: |
-          cd ansible
-          ansible-playbook \
-            --limit ${{ inputs.target_hosts || 'all' }} \
-            -v \
-            playbooks/system-update.yml \
-            ${{ (inputs.enable_reboot == true || github.event_name == 'push' || github.event_name == 'schedule') && '-e enable_reboot=true' || '' }}
 
       - name: Generate update summary
         if: always()
