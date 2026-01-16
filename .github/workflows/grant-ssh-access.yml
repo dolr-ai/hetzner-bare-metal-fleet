@@ -138,6 +138,49 @@ jobs:
           eval "$(ssh-agent -s)"
           ssh-add ~/.ssh/id_ed25519
 
+      - name: Test Ansible connectivity
+        run: |
+          cd ansible
+          ansible ${{ inputs.target_host }} -m ping -v
+
+      - name: Deploy SSH keys to target host(s)
+        run: |
+          cd ansible
+          ansible-playbook \
+            --limit "${{ inputs.target_host }}" \
+            -v \
+            playbooks/ssh-security.yml
+
+      - name: Verify SSH keys on server
+        run: |
+          cd ansible
+          echo "## 🔍 Verifying SSH keys deployed to server(s)" 
+          echo ""
+          ansible ${{ inputs.target_host }} -m shell -a "cat /root/.ssh/authorized_keys" -v
+
+      - name: Generate access grant summary
+        if: always()
+        run: |
+          echo "## 🔑 Temporary SSH Access Granted" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **User** | ${{ steps.map_key.outputs.user_email }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Target Host(s)** | \`${{ inputs.target_host }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Granted At** | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Workflow Run** | [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ⏰ Auto-Revocation Notice" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> **This access will be automatically revoked** on the next scheduled fleet management run." >> $GITHUB_STEP_SUMMARY
+          echo "> The [Run Ansible Playbooks](${{ github.server_url }}/${{ github.repository }}/actions/workflows/run-ansible-playbooks.yml) workflow runs every **Sunday at 2 AM UTC** and restores SSH keys to baseline (GitHub Actions + Saikat only)." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Authorized Keys in Workflow (before deployment)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat ansible/files/authorized_keys >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
