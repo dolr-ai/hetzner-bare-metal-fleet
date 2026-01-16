@@ -124,7 +124,7 @@ jobs:
           ansible ${{ inputs.target_hosts || 'all' }} -m ping -v
 
       - name: Run system update playbook (dry run)
-        if: ${{ inputs.dry_run == true && (inputs.run_system_update == true || inputs.run_system_update == null) }}
+        if: ${{ inputs.dry_run == true && inputs.run_system_update == true }}
         run: |
           cd ansible
           ansible-playbook \
@@ -135,7 +135,7 @@ jobs:
             playbooks/system-update.yml
 
       - name: Run system update playbook
-        if: ${{ inputs.dry_run != true && (inputs.run_system_update == true || inputs.run_system_update == null || github.event_name == 'push' || github.event_name == 'schedule') }}
+        if: ${{ inputs.dry_run != true && (inputs.run_system_update == true || github.event_name == 'push' || github.event_name == 'schedule') }}
         run: |
           cd ansible
           ansible-playbook \
@@ -145,7 +145,7 @@ jobs:
             ${{ (inputs.enable_reboot == true || github.event_name == 'push' || github.event_name == 'schedule') && '-e enable_reboot=true' || '' }}
 
       - name: Run SSH security playbook (dry run)
-        if: ${{ inputs.dry_run == true && (inputs.run_ssh_security == true || inputs.run_ssh_security == null) }}
+        if: ${{ inputs.dry_run == true && inputs.run_ssh_security == true }}
         run: |
           cd ansible
           ansible-playbook \
@@ -156,7 +156,7 @@ jobs:
             playbooks/ssh-security.yml
 
       - name: Run SSH security playbook
-        if: ${{ inputs.dry_run != true && (inputs.run_ssh_security == true || inputs.run_ssh_security == null || github.event_name == 'push' || github.event_name == 'schedule') }}
+        if: ${{ inputs.dry_run != true && (inputs.run_ssh_security == true || github.event_name == 'push' || github.event_name == 'schedule') }}
         run: |
           cd ansible
           ansible-playbook \
@@ -165,7 +165,7 @@ jobs:
             playbooks/ssh-security.yml
 
       - name: Run Docker setup playbook (dry run)
-        if: ${{ inputs.dry_run == true && (inputs.run_docker_setup == true || inputs.run_docker_setup == null) }}
+        if: ${{ inputs.dry_run == true && inputs.run_docker_setup == true }}
         run: |
           cd ansible
           ansible-playbook \
@@ -176,7 +176,7 @@ jobs:
             playbooks/docker-setup.yml
 
       - name: Run Docker setup playbook
-        if: ${{ inputs.dry_run != true && (inputs.run_docker_setup == true || inputs.run_docker_setup == null || github.event_name == 'push' || github.event_name == 'schedule') }}
+        if: ${{ inputs.dry_run != true && (inputs.run_docker_setup == true || github.event_name == 'push' || github.event_name == 'schedule') }}
         run: |
           cd ansible
           ansible-playbook \
@@ -185,7 +185,7 @@ jobs:
             playbooks/docker-setup.yml
 
       - name: Run Beszel agent setup playbook (dry run)
-        if: ${{ inputs.dry_run == true && (inputs.run_beszel_agent == true || inputs.run_beszel_agent == null) }}
+        if: ${{ inputs.dry_run == true && inputs.run_beszel_agent == true }}
         run: |
           cd ansible
           ansible-playbook \
@@ -196,7 +196,7 @@ jobs:
             playbooks/beszel-agent-setup.yml
 
       - name: Run Beszel agent setup playbook
-        if: ${{ inputs.dry_run != true && (inputs.run_beszel_agent == true || inputs.run_beszel_agent == null || github.event_name == 'push' || github.event_name == 'schedule') }}
+        if: ${{ inputs.dry_run != true && (inputs.run_beszel_agent == true || github.event_name == 'push' || github.event_name == 'schedule') }}
         run: |
           cd ansible
           ansible-playbook \
