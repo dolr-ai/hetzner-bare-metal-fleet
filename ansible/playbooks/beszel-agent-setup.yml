@@ -81,30 +81,38 @@
               lines = f.readlines()
 
           result = []
-          skip = False
-          indent_level = 0
+          in_beszel_block = False
+          beszel_indent = 0
 
           for line in lines:
-              # Check if this is a beszel-agent service definition
-              if re.match(r'^\s+beszel-agent:\s*$', line):
-                  skip = True
-                  # Get the indentation level
-                  indent_level = len(line) - len(line.lstrip())
+              # Skip any Ansible marker comments
+              if 'ANSIBLE MANAGED BLOCK' in line:
                   continue
               
-              # If we're skipping and hit a line with same or less indentation (new service or end)
-              if skip:
-                  current_indent = len(line) - len(line.lstrip())
-                  # If blank line or comment, skip it
-                  if line.strip() == '' or line.strip().startswith('#'):
+              # Check if this line starts a beszel-agent service
+              match = re.match(r'^(\s+)beszel-agent:\s*$', line)
+              if match:
+                  in_beszel_block = True
+                  beszel_indent = len(match.group(1))
+                  continue
+              
+              if in_beszel_block:
+                  # Blank lines in the block - skip
+                  if line.strip() == '':
                       continue
-                  # If we hit a line with same or less indentation, stop skipping
-                  if current_indent <= indent_level:
-                      skip = False
+                  
+                  current_indent = len(line) - len(line.lstrip())
+                  
+                  # If this line has same or less indentation, we've left the block
+                  if current_indent <= beszel_indent:
+                      in_beszel_block = False
+                      # Fall through to append this line
                   else:
+                      # Still in beszel block, skip this line
                       continue
               
-              if not skip:
+              # Add the line if we're not in a beszel block
+              if not in_beszel_block:
                   result.append(line)
 
           with open('/root/docker-compose.yml', 'w') as f:
