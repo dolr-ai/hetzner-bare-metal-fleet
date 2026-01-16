@@ -1,0 +1,20 @@
+# Ansible vault password files
+ansible/.vault_pass
+.vault_pass
+
+# Ansible logs
+ansible/ansible.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv
+
+# OS
+.DS_Store
+Thumbs.db

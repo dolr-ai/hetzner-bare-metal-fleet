@@ -1,0 +1,128 @@
+---
+- name: Beszel Agent Docker Compose Setup
+  hosts: all
+  gather_facts: true
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    docker_compose_path: /root/docker-compose.yml
+    beszel_listen_port: 45876
+    beszel_ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFbMj/W6oT9440QejCiVlJbnuBlWK/mCxJnzEHO1dOYq"
+    beszel_hub_url: "https://beszel.yral.com"
+
+  tasks:
+    - name: Wait for system to be ready
+      wait_for_connection:
+        timeout: 60
+
+    - name: Check if system is Debian/Ubuntu
+      fail:
+        msg: "This playbook is designed for Debian/Ubuntu systems only"
+      when: ansible_os_family != "Debian"
+
+    - name: Check if Docker is installed
+      command: docker --version
+      register: docker_check
+      failed_when: false
+      changed_when: false
+
+    - name: Fail if Docker is not installed
+      fail:
+        msg: "Docker is not installed. Please run docker-setup.yml playbook first."
+      when: docker_check.rc != 0
+
+    - name: Display Docker version
+      debug:
+        msg: "Docker version: {{ docker_check.stdout }}"
+
+    - name: Check if docker-compose.yml exists
+      stat:
+        path: "{{ docker_compose_path }}"
+      register: compose_file
+
+    - name: Create docker-compose.yml if it doesn't exist
+      copy:
+        dest: "{{ docker_compose_path }}"
+        content: |
+          version: "3.8"
+          services:
+        mode: "0644"
+      when: not compose_file.stat.exists
+
+    - name: Display compose file status
+      debug:
+        msg: "docker-compose.yml {{ 'already exists' if compose_file.stat.exists else 'was created' }}"
+
+    - name: Check if beszel_agent_token is defined
+      fail:
+        msg: "beszel_agent_token is not defined for host {{ inventory_hostname }}. Please set it in host_vars/{{ inventory_hostname }}.yml"
+      when: beszel_agent_token is not defined or beszel_agent_token == ""
+
+    - name: Ensure docker-compose.yml has beszel-agent service
+      blockinfile:
+        path: "{{ docker_compose_path }}"
+        marker: "  # {mark} ANSIBLE MANAGED BLOCK - BESZEL AGENT"
+        block: |2
+            beszel-agent:
+              image: henrygd/beszel-agent
+              container_name: beszel-agent
+              restart: unless-stopped
+              network_mode: host
+              volumes:
+                - /var/run/docker.sock:/var/run/docker.sock:ro
+                - ./beszel_agent_data:/var/lib/beszel-agent
+                - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:ro
+                # monitor other disks / partitions by mounting a folder in /extra-filesystems
+                # - /mnt/disk/.beszel:/extra-filesystems/sda1:ro
+              environment:
+                LISTEN: {{ beszel_listen_port }}
+                KEY: "{{ beszel_ssh_key }}"
+                TOKEN: {{ beszel_agent_token }}
+                HUB_URL: {{ beszel_hub_url }}
+              security_opt:
+                - apparmor:unconfined
+      register: compose_updated
+
+    - name: Display update status
+      debug:
+        msg: "Beszel agent service was {{ 'updated' if compose_updated.changed else 'already configured' }}"
+
+    - name: Validate docker-compose.yml syntax
+      command: docker compose -f {{ docker_compose_path }} config --quiet
+      args:
+        chdir: /root
+      register: compose_validation
+      failed_when: compose_validation.rc != 0
+      changed_when: false
+
+    - name: Display validation result
+      debug:
+        msg: "docker-compose.yml syntax is valid"
+
+    - name: Start beszel-agent container
+      command: docker compose -f {{ docker_compose_path }} up -d beszel-agent
+      args:
+        chdir: /root
+      when: compose_updated.changed
+      register: docker_compose_up
+
+    - name: Display container status
+      debug:
+        msg: "Beszel agent container {{ 'started/updated' if compose_updated.changed else 'no changes needed' }}"
+
+    - name: Wait for beszel-agent container to be healthy
+      command: docker inspect --format='{{`{{.State.Status}}`}}' beszel-agent
+      register: container_status
+      until: container_status.stdout == "running"
+      retries: 10
+      delay: 3
+      changed_when: false
+      when: compose_updated.changed
+
+    - name: Display final container status
+      command: docker ps --filter name=beszel-agent --format "table {{`{{.Names}}\t{{.Status}}\t{{.Ports}}`}}"
+      register: container_info
+      changed_when: false
+
+    - name: Show beszel-agent container info
+      debug:
+        msg: "{{ container_info.stdout_lines }}"

@@ -28,6 +28,11 @@ on:
         required: false
         default: true
         type: boolean
+      run_beszel_agent:
+        description: "Run Beszel agent setup"
+        required: false
+        default: true
+        type: boolean
 
       enable_reboot:
         description: "Enable automatic reboot if required"
@@ -99,6 +104,14 @@ jobs:
           eval "$(ssh-agent -s)"
           ssh-add ~/.ssh/id_ed25519
 
+      - name: Set up Ansible vault password
+        env:
+          VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          cd ansible
+          echo "$VAULT_PASSWORD" > .vault_pass
+          chmod 600 .vault_pass
+
       - name: Test Ansible connectivity
         run: |
           cd ansible
@@ -165,6 +178,26 @@ jobs:
             -v \
             playbooks/docker-setup.yml
 
+      - name: Run Beszel agent setup playbook (dry run)
+        if: ${{ inputs.dry_run == true && (inputs.run_beszel_agent == true || inputs.run_beszel_agent == null) }}
+        run: |
+          cd ansible
+          ansible-playbook \
+            --limit ${{ inputs.target_hosts || 'all' }} \
+            --check \
+            --diff \
+            -v \
+            playbooks/beszel-agent-setup.yml
+
+      - name: Run Beszel agent setup playbook
+        if: ${{ inputs.dry_run != true && (inputs.run_beszel_agent == true || inputs.run_beszel_agent == null || github.event_name == 'push' || github.event_name == 'schedule') }}
+        run: |
+          cd ansible
+          ansible-playbook \
+            --limit ${{ inputs.target_hosts || 'all' }} \
+            -v \
+            playbooks/beszel-agent-setup.yml
+
       - name: Generate update summary
         if: always()
         run: |
@@ -174,6 +207,7 @@ jobs:
           echo "**SSH Security:** ${{ inputs.run_ssh_security || 'true (auto)' }}" >> $GITHUB_STEP_SUMMARY
           echo "**Docker Setup:** ${{ inputs.run_docker_setup || 'true (auto)' }}" >> $GITHUB_STEP_SUMMARY
           echo "**System Update:** ${{ inputs.run_system_update || 'true (auto)' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Beszel Agent:** ${{ inputs.run_beszel_agent || 'true (auto)' }}" >> $GITHUB_STEP_SUMMARY
 
           echo "**Dry Run:** ${{ inputs.dry_run || 'false' }}" >> $GITHUB_STEP_SUMMARY
           echo "**Enable Reboot:** ${{ inputs.enable_reboot || 'false' }}" >> $GITHUB_STEP_SUMMARY

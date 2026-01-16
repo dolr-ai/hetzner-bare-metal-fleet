@@ -30,11 +30,21 @@ ssh -o "StrictHostKeyChecking=no" -o "UserKnownHostsFile=/dev/null" root@$IP_ADD
 
 This repository contains scripts to automate the setup of Hetzner bare metal servers with btrfs and Docker.
 
+## Quick Start (for contributors)
+
+After cloning this repository:
+```bash
+./setup.sh
+```
+
+This one-time setup configures git hooks for automatic secret encryption and checks your environment.
+
 ## Prerequisites
 
 1. A Hetzner dedicated server
 2. Access to Hetzner Robot panel
 3. SSH access
+4. Ansible installed locally (for managing the fleet)
 
 ## Installation Steps
 
@@ -193,4 +203,89 @@ visudo
 
 ```bash
 hostnamectl set-hostname <new-hostname>
+```
+
+## Ansible Playbooks
+
+This repository includes Ansible playbooks for managing the fleet:
+
+- `playbooks/system-update.yml` - System updates and upgrades
+- `playbooks/ssh-security.yml` - SSH security audit and configuration
+- `playbooks/docker-setup.yml` - Docker installation
+- `playbooks/beszel-agent-setup.yml` - Beszel monitoring agent setup
+
+### Ansible Vault Setup
+
+The Beszel agent playbook uses Ansible vault to securely store per-host agent tokens.
+
+#### Local Setup
+
+**After cloning, run the setup script once:**
+```bash
+./setup.sh
+```
+
+This configures git hooks automatically. Then:
+
+1. Create the vault password file:
+```bash
+cd ansible
+echo "your-vault-password-here" > .vault_pass
+chmod 600 .vault_pass
+```
+
+2. Edit host-specific tokens (obtain tokens from your Beszel hub at https://beszel.yral.com):
+```bash
+# Edit each host's token file (unencrypted initially)
+cd inventory/host_vars
+# Edit the file with your favorite editor
+nano airflow-1.yml
+# Replace PLACEHOLDER_TOKEN_HERE with the actual token from beszel hub
+# Repeat for all 16 hosts
+```
+
+**Note:** You can edit the files in plain text. When you commit, the pre-commit hook will automatically encrypt them.
+
+3. Run the playbook:
+```bash
+cd ansible
+ansible-playbook playbooks/beszel-agent-setup.yml
+```
+
+#### GitHub Actions Setup
+
+The GitHub Actions workflow automatically uses the vault password from GitHub secrets:
+
+1. Add the vault password as a secret named `ANSIBLE_VAULT_PASSWORD` in your repository settings
+2. The workflow will automatically decrypt the tokens when running
+
+#### Encrypting New Tokens
+
+The pre-commit hook handles encryption automatically, but if you need to manually encrypt:
+
+```bash
+cd ansible/inventory/host_vars
+# Create a new file with the token
+echo 'beszel_agent_token: "your-token-here"' > new-host.yml
+# Encrypt it manually (or let the pre-commit hook do it)
+ansible-vault encrypt new-host.yml
+```
+
+To edit already encrypted files:
+
+```bash
+# Decrypt, edit, and the pre-commit hook will re-encrypt on commit
+ansible-vault decrypt airflow-1.yml
+nano airflow-1.yml
+git add airflow-1.yml
+git commit -m "Update token"  # Hook encrypts automatically
+
+# Or use ansible-vault edit (encrypts after editing)
+ansible-vault edit airflow-1.yml
+```
+
+Or use encrypt_string for inline encryption:
+
+```bash
+ansible-vault encrypt_string 'your-token-here' --name 'beszel_agent_token'
 ```
