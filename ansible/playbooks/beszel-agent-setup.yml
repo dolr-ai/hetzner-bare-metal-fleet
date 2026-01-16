@@ -71,43 +71,45 @@
       register: block_removed
 
     - name: Remove any remaining non-managed beszel-agent entries
-      shell: |
-        python3 << 'EOF'
-        import re
+      script:
+        cmd: /dev/stdin
+        executable: python3
+      args:
+        stdin: |
+          import re
 
-        with open('/root/docker-compose.yml', 'r') as f:
-            lines = f.readlines()
+          with open('/root/docker-compose.yml', 'r') as f:
+              lines = f.readlines()
 
-        result = []
-        skip = False
-        indent_level = 0
+          result = []
+          skip = False
+          indent_level = 0
 
-        for line in lines:
-            # Check if this is a beszel-agent service definition
-            if re.match(r'^\s+beszel-agent:\s*$', line):
-                skip = True
-                # Get the indentation level
-                indent_level = len(line) - len(line.lstrip())
-                continue
-            
-            # If we're skipping and hit a line with same or less indentation (new service or end)
-            if skip:
-                current_indent = len(line) - len(line.lstrip())
-                # If blank line or comment, skip it
-                if line.strip() == '' or line.strip().startswith('#'):
-                    continue
-                # If we hit a line with same or less indentation, stop skipping
-                if current_indent <= indent_level:
-                    skip = False
-                else:
-                    continue
-            
-            if not skip:
-                result.append(line)
+          for line in lines:
+              # Check if this is a beszel-agent service definition
+              if re.match(r'^\s+beszel-agent:\s*$', line):
+                  skip = True
+                  # Get the indentation level
+                  indent_level = len(line) - len(line.lstrip())
+                  continue
+              
+              # If we're skipping and hit a line with same or less indentation (new service or end)
+              if skip:
+                  current_indent = len(line) - len(line.lstrip())
+                  # If blank line or comment, skip it
+                  if line.strip() == '' or line.strip().startswith('#'):
+                      continue
+                  # If we hit a line with same or less indentation, stop skipping
+                  if current_indent <= indent_level:
+                      skip = False
+                  else:
+                      continue
+              
+              if not skip:
+                  result.append(line)
 
-        with open('/root/docker-compose.yml', 'w') as f:
-            f.writelines(result)
-        EOF
+          with open('/root/docker-compose.yml', 'w') as f:
+              f.writelines(result)
       changed_when: false
 
     - name: Ensure docker-compose.yml has beszel-agent service
