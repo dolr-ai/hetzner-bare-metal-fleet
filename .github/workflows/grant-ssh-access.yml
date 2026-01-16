@@ -16,7 +16,6 @@ on:
       target_host:
         description: "Target host (specific hostname from inventory, or 'all')"
         required: true
-        default: "all"
         type: string
 
 env:
