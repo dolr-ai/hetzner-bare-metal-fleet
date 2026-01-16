@@ -102,8 +102,10 @@
                       # Check if this looks like a service definition or property
                       if re.match(r'^\s+(image|container_name|restart|network_mode|volumes|environment|security_opt):', line):
                           # This is an orphaned property from duplicate beszel-agent
-                          # Start skipping until we find a proper service definition
-                          skip_until_indent = len(line) - len(line.lstrip()) - 2
+                          # Calculate the indent level of this property
+                          property_indent = len(line) - len(line.lstrip())
+                          # We want to skip until we find a service name (2 levels less)
+                          skip_until_indent = property_indent - 2
                           just_saw_end_marker = False
                           continue
                       elif re.match(r'^\s+\w+:\s*$', line):
