@@ -106,7 +106,13 @@
                   # If this line has same or less indentation, we've left the block
                   if current_indent <= beszel_indent:
                       in_beszel_block = False
-                      # Fall through to append this line
+                      # Check if this new line is ANOTHER beszel-agent service
+                      if re.match(r'^(\s+)beszel-agent:\s*$', line):
+                          # Start skipping this block too
+                          in_beszel_block = True
+                          beszel_indent = len(line) - len(line.lstrip())
+                          continue
+                      # Otherwise fall through to append this line
                   else:
                       # Still in beszel block, skip this line
                       continue
