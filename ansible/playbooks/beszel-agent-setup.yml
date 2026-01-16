@@ -70,12 +70,11 @@
         state: absent
       register: block_removed
 
-    - name: Remove any remaining non-managed beszel-agent entries
-      script:
-        cmd: /dev/stdin
-        executable: python3
-      args:
-        stdin: |
+    - name: Create Python cleanup script
+      copy:
+        dest: /tmp/cleanup_beszel.py
+        mode: "0755"
+        content: |
           import re
 
           with open('/root/docker-compose.yml', 'r') as f:
@@ -110,6 +109,16 @@
 
           with open('/root/docker-compose.yml', 'w') as f:
               f.writelines(result)
+      changed_when: false
+
+    - name: Remove any remaining non-managed beszel-agent entries
+      command: python3 /tmp/cleanup_beszel.py
+      changed_when: false
+
+    - name: Clean up temporary script
+      file:
+        path: /tmp/cleanup_beszel.py
+        state: absent
       changed_when: false
 
     - name: Ensure docker-compose.yml has beszel-agent service
