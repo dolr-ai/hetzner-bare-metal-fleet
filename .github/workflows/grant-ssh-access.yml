@@ -1,0 +1,195 @@
+name: Grant Temporary SSH Access
+
+on:
+  workflow_dispatch:
+    inputs:
+      user:
+        description: "User to grant SSH access to"
+        required: true
+        type: choice
+        options:
+          - Jay (jay@gobazzinga.io)
+          - Joel (joel@gobazzinga.io)
+          - Kevin (kevin@gobazzinga.io)
+          - Naitik (naitik@gobazzinga.io)
+          - Ravi (ravi@gobazzinga.io)
+      target_host:
+        description: "Target host (specific hostname from inventory, or 'all')"
+        required: true
+        default: "all"
+        type: string
+
+env:
+  ANSIBLE_HOST_KEY_CHECKING: False
+  ANSIBLE_FORCE_COLOR: True
+
+jobs:
+  grant-access:
+    name: Grant Temporary SSH Access
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install Ansible and dependencies
+        run: |
+          pip install --upgrade pip
+          pip install ansible ansible-core pyyaml
+          ansible-galaxy collection install ansible.posix community.general
+
+      - name: Map user to SSH public key
+        id: map_key
+        run: |
+          case "${{ inputs.user }}" in
+            "Jay (jay@gobazzinga.io)")
+              USER_EMAIL="jay@gobazzinga.io"
+              SSH_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC4EEE0Ujs02S8QJojavczuX8DqesE3OdaATdN7/b592 jay@gobazzinga.io"
+              ;;
+            "Joel (joel@gobazzinga.io)")
+              USER_EMAIL="joel@gobazzinga.io"
+              SSH_KEY="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCfknevgb+805mjUliPsHJxbKdCePkUSkhSefgiC6uZOltQCYo4G8H0il5l53+HNPYptqKTtKResEUBwsK7zOdfItnU9Gyp8Zqzs/GfY4ICyYGfXrgIDk/J41wSG/0LBmnICu7gM9STETbjKZF7yLwtKlhnJyLHzAtCuH2QKNI2gV4psfsIruT4ZbYPEX0Yn1L63AoxYuJ+ligqWvkxy91/NJE1qt2Mt9HtWnTp0nsFHfbiomGaqwEKNy+tFWiVJucLHgJ9KoYOUApI2MYn/vZVtuU4uWz0yQfuFJwNVwDyPu14RrcbZqM8Uwg+x3YnY+sgv4671ajb1mgxh41L2SXYa1pg0wqbq1ah0BtPaJD3rckaCSmtlfQUs2SY2+eCyLK29WtwALld+XCkFt5VtD94K2ujoOJ1SoAjCCSOYv5XLAbMcZnoa5n9DO2UQMACRo6XbRO/DnqTCHleC6Kh735ZJNOihN3NOVYIT3nxvHPAOL6Huv+vSlDXUSAd5nMDbHj8WA1/08LWLqcrLSiDGi4No6DAcl40cH6nF902u0khx8z9IPWBi/p5Ra2xznJG65emXJnThc3Pj29C2FQsWlaaCOWtGoxSinic+Azp1EJBUIk0sxEsX2xW3wJboYC2MnLBYlVAy07+c6EMCrwEjexBkwJSYEIaqFOt+w== joel@gobazzinga.io"
+              ;;
+            "Kevin (kevin@gobazzinga.io)")
+              USER_EMAIL="kevin@gobazzinga.io"
+              SSH_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDeh+bxWavxerRDziQ2vFFw7isP3lC408Y1z4CbK1Thz kevin@gobazzinga.io"
+              ;;
+            "Naitik (naitik@gobazzinga.io)")
+              USER_EMAIL="naitik@gobazzinga.io"
+              SSH_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEiXkPkZghjS+QfvScVTFRsUZCh7ibH80bb/ls4ddJHs naitik@gobazzinga.io"
+              ;;
+            "Ravi (ravi@gobazzinga.io)")
+              USER_EMAIL="ravi@gobazzinga.io"
+              SSH_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF1ugc8F2HoW2SGAn35Eoo3bt8KjGgfTn8fIczXM40o2 ravi@gobazzinga.io"
+              ;;
+            *)
+              echo "::error::Unknown user: ${{ inputs.user }}"
+              exit 1
+              ;;
+          esac
+
+          echo "user_email=$USER_EMAIL" >> $GITHUB_OUTPUT
+          # Export SSH key as multi-line output
+          {
+            echo 'ssh_key<<EOF'
+            echo "$SSH_KEY"
+            echo EOF
+          } >> $GITHUB_OUTPUT
+
+      - name: Validate target host exists in inventory
+        run: |
+          cd ansible
+
+          TARGET="${{ inputs.target_host }}"
+
+          # Skip validation for 'all'
+          if [ "$TARGET" == "all" ]; then
+            echo "✓ Target is 'all' - skipping host validation"
+            exit 0
+          fi
+
+          # Check if host exists in inventory
+          if ansible-inventory --list | grep -q "\"$TARGET\""; then
+            echo "✓ Host '$TARGET' found in inventory"
+          else
+            echo "::error::Host '$TARGET' not found in inventory"
+            echo "Available hosts:"
+            ansible-inventory --list | jq -r '.all.children.ungrouped.hosts[]' || true
+            exit 1
+          fi
+
+      - name: Add user SSH key to authorized_keys
+        run: |
+          echo "" >> ansible/files/authorized_keys
+          echo "${{ steps.map_key.outputs.ssh_key }}" >> ansible/files/authorized_keys
+          echo "✓ Added SSH key for ${{ steps.map_key.outputs.user_email }}"
+          echo ""
+          echo "Updated authorized_keys:"
+          cat ansible/files/authorized_keys
+
+      - name: Set up SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.HETZNER_BARE_METAL_GITHUB_ACTIONS_SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # Add SSH agent configuration
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_ed25519
+
+      - name: Set up Ansible vault password
+        env:
+          VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          if [ -z "$VAULT_PASSWORD" ]; then
+            echo "::error::ANSIBLE_VAULT_PASSWORD secret is not set or is empty"
+            echo "Please add the vault password as a repository secret named ANSIBLE_VAULT_PASSWORD"
+            exit 1
+          fi
+          cd ansible
+          echo "$VAULT_PASSWORD" > .vault_pass
+          chmod 600 .vault_pass
+          echo "✓ Vault password file created"
+
+      - name: Test Ansible connectivity
+        run: |
+          cd ansible
+          ansible ${{ inputs.target_host }} -m ping -v
+
+      - name: Deploy SSH keys to target host(s)
+        run: |
+          cd ansible
+          ansible-playbook \
+            --limit "${{ inputs.target_host }}" \
+            -v \
+            playbooks/ssh-security.yml
+
+      - name: Generate access grant summary
+        if: always()
+        run: |
+          echo "## 🔑 Temporary SSH Access Granted" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **User** | ${{ steps.map_key.outputs.user_email }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Target Host(s)** | \`${{ inputs.target_host }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Granted At** | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Workflow Run** | [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ⏰ Auto-Revocation Notice" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> **This access will be automatically revoked** on the next scheduled fleet management run." >> $GITHUB_STEP_SUMMARY
+          echo "> The [Run Ansible Playbooks](${{ github.server_url }}/${{ github.repository }}/actions/workflows/run-ansible-playbooks.yml) workflow runs every **Sunday at 2 AM UTC** and restores SSH keys to baseline (GitHub Actions + Saikat only)." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Current Authorized Keys" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat ansible/files/authorized_keys >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Ansible logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ssh-access-grant-logs-${{ github.run_id }}
+          path: |
+            ansible/ansible.log
+          retention-days: 30
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Failed to grant SSH access to ${{ steps.map_key.outputs.user_email }} on ${{ inputs.target_host }}"
+          echo "Check the logs and artifacts for more details."
+
+      - name: Success notification
+        if: success()
+        run: |
+          echo "::notice::✓ Successfully granted SSH access to ${{ steps.map_key.outputs.user_email }} on ${{ inputs.target_host }}"
