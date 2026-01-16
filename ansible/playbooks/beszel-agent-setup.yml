@@ -57,43 +57,41 @@
         msg: "beszel_agent_token is not defined for host {{ inventory_hostname }}. Please set it in host_vars/{{ inventory_hostname }}.yml"
       when: beszel_agent_token is not defined or beszel_agent_token == ""
 
-    - name: Read docker-compose.yml content
-      slurp:
+    - name: Create backup of docker-compose.yml
+      copy:
+        src: "{{ docker_compose_path }}"
+        dest: "{{ docker_compose_path }}.backup-{{ ansible_date_time.epoch }}"
+        remote_src: yes
+
+    - name: Remove existing Ansible-managed beszel-agent block
+      blockinfile:
         path: "{{ docker_compose_path }}"
-      register: compose_content
+        marker: "  # {mark} ANSIBLE MANAGED BLOCK - BESZEL AGENT"
+        state: absent
+      register: block_removed
 
-    - name: Check if beszel-agent already managed by Ansible
-      set_fact:
-        beszel_managed: "{{ (compose_content.content | b64decode) is search('# BEGIN ANSIBLE MANAGED BLOCK - BESZEL AGENT') }}"
-
-    - name: Backup and clean docker-compose.yml if beszel-agent exists but not managed
-      block:
-        - name: Create backup of docker-compose.yml
-          copy:
-            src: "{{ docker_compose_path }}"
-            dest: "{{ docker_compose_path }}.backup-{{ ansible_date_time.epoch }}"
-            remote_src: yes
-
-        - name: Remove non-managed beszel-agent service
-          lineinfile:
-            path: "{{ docker_compose_path }}"
-            regexp: '^\s+beszel-agent:'
-            state: absent
-
-        - name: Remove beszel-agent configuration lines
-          lineinfile:
-            path: "{{ docker_compose_path }}"
-            regexp: '^\s+(image|container_name|restart|network_mode|volumes|environment|security_opt|LISTEN|KEY|TOKEN|HUB_URL):\s+(henrygd/beszel-agent|beszel-agent|unless-stopped|host|.*beszel.*|apparmor:unconfined|\d+|ssh-ed25519.*|.*beszel\.yral\.com|.*docker\.sock.*|.*dbus.*)'
-            state: absent
-      when:
-        - not beszel_managed
-        - (compose_content.content | b64decode) is search('beszel-agent')
+    - name: Remove any remaining non-managed beszel-agent entries
+      shell: |
+        if grep -q "^\s*beszel-agent:" "{{ docker_compose_path }}"; then
+          # Create temp file without beszel-agent service
+          awk '
+          /^[[:space:]]*beszel-agent:/ { skip=1; next }
+          /^[[:space:]]*[a-z]/ && skip { skip=0 }
+          /^[[:space:]]*#/ && skip { next }
+          !skip { print }
+          ' "{{ docker_compose_path }}" > "{{ docker_compose_path }}.tmp"
+          mv "{{ docker_compose_path }}.tmp" "{{ docker_compose_path }}"
+        fi
+      args:
+        executable: /bin/bash
+      changed_when: false
 
     - name: Ensure docker-compose.yml has beszel-agent service
       blockinfile:
         path: "{{ docker_compose_path }}"
         marker: "  # {mark} ANSIBLE MANAGED BLOCK - BESZEL AGENT"
         insertafter: "^services:"
+        state: present
         block: |2
             beszel-agent:
               image: henrygd/beszel-agent
