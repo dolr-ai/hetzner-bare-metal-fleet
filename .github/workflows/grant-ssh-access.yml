@@ -137,6 +137,8 @@ jobs:
           # Add SSH agent configuration
           eval "$(ssh-agent -s)"
           ssh-add ~/.ssh/id_ed25519
+
+      - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
