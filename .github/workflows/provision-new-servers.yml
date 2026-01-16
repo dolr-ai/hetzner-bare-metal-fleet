@@ -137,6 +137,20 @@ jobs:
           eval "$(ssh-agent -s)"
           ssh-add ~/.ssh/id_ed25519
 
+      - name: Set up Ansible vault password
+        env:
+          VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          if [ -z "$VAULT_PASSWORD" ]; then
+            echo "::error::ANSIBLE_VAULT_PASSWORD secret is not set or is empty"
+            echo "Please add the vault password as a repository secret named ANSIBLE_VAULT_PASSWORD"
+            exit 1
+          fi
+          cd ansible
+          echo "$VAULT_PASSWORD" > .vault_pass
+          chmod 600 .vault_pass
+          echo "✓ Vault password file created"
+
       - name: Determine target hosts
         id: target
         run: |
