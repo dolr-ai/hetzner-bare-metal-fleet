@@ -110,7 +110,7 @@
         msg: "Beszel agent container {{ 'started/updated' if compose_updated.changed else 'no changes needed' }}"
 
     - name: Wait for beszel-agent container to be healthy
-      command: docker inspect --format='{{`{{.State.Status}}`}}' beszel-agent
+      command: "docker inspect --format='{{ '{{' }}.State.Status{{ '}}' }}' beszel-agent"
       register: container_status
       until: container_status.stdout == "running"
       retries: 10
@@ -119,7 +119,7 @@
       when: compose_updated.changed
 
     - name: Display final container status
-      command: docker ps --filter name=beszel-agent --format "table {{`{{.Names}}\t{{.Status}}\t{{.Ports}}`}}"
+      command: "docker ps --filter name=beszel-agent --format 'table {{ '{{' }}.Names{{ '}}' }}\t{{ '{{' }}.Status{{ '}}' }}\t{{ '{{' }}.Ports{{ '}}' }}'"
       register: container_info
       changed_when: false
 
