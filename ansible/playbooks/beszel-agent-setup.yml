@@ -82,39 +82,14 @@
 
           result = []
           skip_until_indent = None
-          just_saw_end_marker = False
 
-          for line in lines:
-              # Track if we just saw the END ANSIBLE MANAGED BLOCK marker
-              if 'END ANSIBLE MANAGED BLOCK' in line:
-                  just_saw_end_marker = True
-                  continue
-              
+          for i, line in enumerate(lines):
               # Skip any Ansible marker comments
               if 'ANSIBLE MANAGED BLOCK' in line:
                   continue
               
-              # If we just saw the end marker and this line starts with properties
-              # that look like beszel-agent config (image, container_name, etc),
-              # it's an orphaned duplicate - skip it
-              if just_saw_end_marker:
-                  if line.strip() and not line.strip().startswith('#'):
-                      # Check if this looks like a service definition or property
-                      if re.match(r'^\s+(image|container_name|restart|network_mode|volumes|environment|security_opt):', line):
-                          # This is an orphaned property from duplicate beszel-agent
-                          # Calculate the indent level of this property
-                          property_indent = len(line) - len(line.lstrip())
-                          # We want to skip until we find a service name (2 levels less)
-                          skip_until_indent = property_indent - 2
-                          just_saw_end_marker = False
-                          continue
-                      elif re.match(r'^\s+\w+:\s*$', line):
-                          # This is a proper service definition, stop special handling
-                          just_saw_end_marker = False
-                  
               # If we're currently skipping lines
               if skip_until_indent is not None:
-                  # Check current line's indentation
                   if line.strip() == '':
                       # Skip blank lines while in skip mode
                       continue
@@ -140,6 +115,33 @@
                   # Start skipping from this indent level
                   skip_until_indent = len(match.group(1))
                   continue
+              
+              # Check if this is an orphaned beszel-agent property (no service name before it)
+              # Look for image: henrygd/beszel-agent which is unique to beszel-agent
+              if re.match(r'^\s+image:\s+henrygd/beszel-agent', line):
+                  # Check if the previous non-empty line was a service name
+                  has_service_name = False
+                  for j in range(i-1, -1, -1):
+                      prev_line = lines[j]
+                      if prev_line.strip() == '':
+                          continue
+                      # If previous line is a service name (2-space indent, ends with :)
+                      if re.match(r'^  \w+:\s*$', prev_line):
+                          # Check if it's beszel-agent
+                          if 'beszel-agent:' in prev_line:
+                              has_service_name = True
+                          break
+                      # If previous line has deeper indent, it's a property not a service
+                      elif len(prev_line) - len(prev_line.lstrip()) > 2:
+                          break
+                      else:
+                          break
+                  
+                  # If no service name, this is orphaned - skip it and all properties after
+                  if not has_service_name:
+                      property_indent = len(line) - len(line.lstrip())
+                      skip_until_indent = property_indent - 2
+                      continue
               
               # Only add line if we're not in skip mode
               if skip_until_indent is None:
