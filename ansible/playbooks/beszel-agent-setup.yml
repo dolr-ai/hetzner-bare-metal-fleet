@@ -82,12 +82,34 @@
 
           result = []
           skip_until_indent = None
+          just_saw_end_marker = False
 
           for line in lines:
+              # Track if we just saw the END ANSIBLE MANAGED BLOCK marker
+              if 'END ANSIBLE MANAGED BLOCK' in line:
+                  just_saw_end_marker = True
+                  continue
+              
               # Skip any Ansible marker comments
               if 'ANSIBLE MANAGED BLOCK' in line:
                   continue
               
+              # If we just saw the end marker and this line starts with properties
+              # that look like beszel-agent config (image, container_name, etc),
+              # it's an orphaned duplicate - skip it
+              if just_saw_end_marker:
+                  if line.strip() and not line.strip().startswith('#'):
+                      # Check if this looks like a service definition or property
+                      if re.match(r'^\s+(image|container_name|restart|network_mode|volumes|environment|security_opt):', line):
+                          # This is an orphaned property from duplicate beszel-agent
+                          # Start skipping until we find a proper service definition
+                          skip_until_indent = len(line) - len(line.lstrip()) - 2
+                          just_saw_end_marker = False
+                          continue
+                      elif re.match(r'^\s+\w+:\s*$', line):
+                          # This is a proper service definition, stop special handling
+                          just_saw_end_marker = False
+                  
               # If we're currently skipping lines
               if skip_until_indent is not None:
                   # Check current line's indentation
