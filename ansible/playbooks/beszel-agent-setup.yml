@@ -153,6 +153,15 @@
       command: python3 /tmp/cleanup_beszel.py
       changed_when: false
 
+    - name: Debug - Show file after cleanup
+      command: head -50 {{ docker_compose_path }}
+      register: after_cleanup
+      changed_when: false
+
+    - name: Display file after cleanup
+      debug:
+        var: after_cleanup.stdout_lines
+
     - name: Clean up temporary script
       file:
         path: /tmp/cleanup_beszel.py
@@ -185,6 +194,15 @@
               security_opt:
                 - apparmor:unconfined
       register: compose_updated
+
+    - name: Debug - Show file after blockinfile insert
+      command: head -50 {{ docker_compose_path }}
+      register: after_insert
+      changed_when: false
+
+    - name: Display file after insert
+      debug:
+        var: after_insert.stdout_lines
 
     - name: Display update status
       debug:
