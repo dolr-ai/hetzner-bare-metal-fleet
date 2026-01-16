@@ -81,44 +81,44 @@
               lines = f.readlines()
 
           result = []
-          in_beszel_block = False
-          beszel_indent = 0
+          skip_until_indent = None
 
           for line in lines:
               # Skip any Ansible marker comments
               if 'ANSIBLE MANAGED BLOCK' in line:
                   continue
               
-              # Check if this line starts a beszel-agent service
-              match = re.match(r'^(\s+)beszel-agent:\s*$', line)
-              if match:
-                  in_beszel_block = True
-                  beszel_indent = len(match.group(1))
-                  continue
-              
-              if in_beszel_block:
-                  # Blank lines in the block - skip
+              # If we're currently skipping lines
+              if skip_until_indent is not None:
+                  # Check current line's indentation
                   if line.strip() == '':
+                      # Skip blank lines while in skip mode
                       continue
                   
                   current_indent = len(line) - len(line.lstrip())
                   
-                  # If this line has same or less indentation, we've left the block
-                  if current_indent <= beszel_indent:
-                      in_beszel_block = False
-                      # Check if this new line is ANOTHER beszel-agent service
+                  # If we find a line at or before the indent level, stop skipping
+                  if current_indent <= skip_until_indent:
+                      skip_until_indent = None
+                      # Check if this line starts ANOTHER beszel-agent service
                       if re.match(r'^(\s+)beszel-agent:\s*$', line):
-                          # Start skipping this block too
-                          in_beszel_block = True
-                          beszel_indent = len(line) - len(line.lstrip())
+                          # Start skipping again from this indent level
+                          skip_until_indent = len(line) - len(line.lstrip())
                           continue
                       # Otherwise fall through to append this line
                   else:
-                      # Still in beszel block, skip this line
+                      # Still deeper than target indent, keep skipping
                       continue
               
-              # Add the line if we're not in a beszel block
-              if not in_beszel_block:
+              # Check if this line starts a beszel-agent service
+              match = re.match(r'^(\s+)beszel-agent:\s*$', line)
+              if match:
+                  # Start skipping from this indent level
+                  skip_until_indent = len(match.group(1))
+                  continue
+              
+              # Only add line if we're not in skip mode
+              if skip_until_indent is None:
                   result.append(line)
 
           with open('/root/docker-compose.yml', 'w') as f:
