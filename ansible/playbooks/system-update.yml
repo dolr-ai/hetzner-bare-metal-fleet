@@ -1,6 +1,7 @@
 ---
 - name: System Update and Upgrade
   hosts: all
+  serial: 1
   gather_facts: true
   vars:
     ansible_python_interpreter: /usr/bin/python3
@@ -41,15 +42,6 @@
       register: upgrade_result
       when: upgradable_packages.stdout|int > 0
 
-    - name: Check if reboot is required
-      stat:
-        path: /var/run/reboot-required
-      register: reboot_required
-
-    - name: Display reboot requirement
-      debug:
-        msg: "System reboot is {{ 'required' if reboot_required.stat.exists else 'not required' }}"
-
     - name: Remove unnecessary packages
       apt:
         autoremove: yes
@@ -64,40 +56,12 @@
         msg: |
           Upgrade Summary:
           - Packages upgraded: {{ upgrade_result.stdout_lines | length if upgrade_result is defined and upgrade_result.stdout_lines is defined else 0 }}
-          - Reboot required: {{ 'Yes' if reboot_required.stat.exists else 'No' }}
-          - Reboot enabled: {{ 'Yes' if enable_reboot is defined and enable_reboot else 'No' }}
       when: upgrade_result is defined
 
-- name: Reboot Systems One at a Time
-  hosts: all
-  gather_facts: false
-  serial: 1
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
-
-  tasks:
-    - name: Check if reboot is required
-      stat:
-        path: /var/run/reboot-required
-      register: reboot_required
-
-    - name: Reboot system if required and enabled
-      reboot:
-        msg: "Rebooting system after package upgrades"
-        reboot_timeout: 300
-        connect_timeout: 20
-        test_command: uptime
-      when:
-        - reboot_required.stat.exists
-        - enable_reboot is defined
-        - enable_reboot | bool
-
-  handlers:
     - name: Reboot system if required
       reboot:
         msg: "Rebooting system after package upgrades"
         reboot_timeout: 300
         connect_timeout: 20
         test_command: uptime
-      listen: "reboot required"
-      when: reboot_required.stat.exists
+      when: upgrade_result is changed
