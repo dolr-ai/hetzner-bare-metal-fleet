@@ -6,6 +6,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOST_VARS_DIR="$SCRIPT_DIR/ansible/inventory/host_vars"
+VAULT_PASS_FILE="${VAULT_PASS_FILE:-$SCRIPT_DIR/ansible/.vault_pass}"
 
 # List of all hosts
 HOSTS=(
@@ -21,6 +22,7 @@ HOSTS=(
     "low-traffic-1"
     "milvus-1"
     "sentry-1"
+    "sentry-2"
     "storj-interface-1"
     "team-dev-server-1"
     "uptime-monitor-1"
@@ -44,8 +46,8 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
 fi
 
 # Check if vault password file exists
-if [ ! -f "$SCRIPT_DIR/ansible/.vault_pass" ]; then
-    echo "ERROR: ansible/.vault_pass not found!"
+if [ ! -f "$VAULT_PASS_FILE" ]; then
+    echo "ERROR: $VAULT_PASS_FILE not found!"
     echo "Please create it first: echo 'your-password' > ansible/.vault_pass"
     exit 1
 fi
@@ -62,7 +64,7 @@ if [ "$OPTION" == "1" ]; then
     echo ""
     echo "Edit each host file manually:"
     for host in "${HOSTS[@]}"; do
-        echo "  cd $HOST_VARS_DIR && ansible-vault edit ${host}.yml"
+        echo "  cd $HOST_VARS_DIR && ansible-vault edit --vault-password-file=$VAULT_PASS_FILE ${host}.yml"
     done
     echo ""
     echo "Replace PLACEHOLDER_TOKEN_HERE with actual tokens from beszel hub."
@@ -87,10 +89,10 @@ if [ "$OPTION" == "2" ]; then
     
     for host in "${HOSTS[@]}"; do
         if [ -f "${host}.yml" ]; then
-            if ansible-vault view "${host}.yml" &>/dev/null; then
+            if ansible-vault view --vault-password-file="$VAULT_PASS_FILE" "${host}.yml" &>/dev/null; then
                 echo "  ✓ ${host}.yml is already encrypted"
             else
-                ansible-vault encrypt "${host}.yml"
+                ansible-vault encrypt --vault-password-file="$VAULT_PASS_FILE" "${host}.yml"
                 echo "  ✓ Encrypted ${host}.yml"
             fi
         else
@@ -101,7 +103,7 @@ if [ "$OPTION" == "2" ]; then
     echo ""
     echo "Done! All files have been encrypted."
     echo ""
-    echo "To edit a file: ansible-vault edit <hostname>.yml"
-    echo "To decrypt a file: ansible-vault decrypt <hostname>.yml"
-    echo "To view a file: ansible-vault view <hostname>.yml"
+    echo "To edit a file: ansible-vault edit --vault-password-file=ansible/.vault_pass <hostname>.yml"
+    echo "To decrypt a file: ansible-vault decrypt --vault-password-file=ansible/.vault_pass <hostname>.yml"
+    echo "To view a file: ansible-vault view --vault-password-file=ansible/.vault_pass <hostname>.yml"
 fi
