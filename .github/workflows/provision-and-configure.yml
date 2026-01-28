@@ -1,34 +1,13 @@
-name: Hetzner Rescue Mode
+name: Provision and Configure Bare Metal Server
 
 on:
+  # Manual trigger only
   workflow_dispatch:
     inputs:
       target_host:
-        description: "Target host to put into rescue mode"
+        description: "Target host to provision (must exist in inventory)"
         required: true
         type: string
-      rescue_os:
-        description: "Rescue OS type"
-        required: true
-        default: "linux"
-        type: choice
-        options:
-          - linux
-          - linuxold
-          - freebsd
-      arch:
-        description: "Architecture"
-        required: true
-        default: "64"
-        type: choice
-        options:
-          - "64"
-          - "32"
-      auto_reboot:
-        description: "Automatically reboot server after activating rescue mode"
-        required: false
-        default: true
-        type: boolean
       additional_ssh_keys:
         description: "Additional SSH keys to add (github-actions and saikatdas always included)"
         required: false
@@ -46,16 +25,21 @@ on:
         description: "Custom SSH key fingerprints (comma-separated, optional)"
         required: false
         type: string
+      auto_configure:
+        description: "Run post-provision configuration (SSH, Docker, Beszel)"
+        required: false
+        default: true
+        type: boolean
 
 env:
   ANSIBLE_HOST_KEY_CHECKING: False
   ANSIBLE_FORCE_COLOR: True
 
 jobs:
-  activate-rescue:
-    name: Activate Rescue Mode
+  provision-and-configure:
+    name: Provision and Configure Server
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 150
 
     steps:
       - name: Checkout repository
@@ -68,7 +52,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pyyaml requests
+          pip install --upgrade pip
+          pip install pyyaml requests ansible ansible-core
+          ansible-galaxy collection install ansible.posix community.general
 
       - name: Get server IP from inventory
         id: get-ip
@@ -121,8 +107,8 @@ jobs:
           api_user = os.environ.get('HETZNER_API_USER')
           api_password = os.environ.get('HETZNER_API_PASSWORD')
           server_ip = "${{ steps.get-ip.outputs.server_ip }}"
-          rescue_os = "${{ github.event.inputs.rescue_os }}"
-          arch = "${{ github.event.inputs.arch }}"
+          rescue_os = "linux"
+          arch = "64"
           additional_keys = "${{ github.event.inputs.additional_ssh_keys }}"
           custom_keys = "${{ github.event.inputs.custom_ssh_keys }}"
 
@@ -259,14 +245,12 @@ jobs:
           EOF
 
       - name: Reboot server via Hetzner API
-        if: github.event.inputs.auto_reboot == 'true'
         env:
           HETZNER_API_USER: ${{ secrets.HETZNER_ROBOT_USER }}
           HETZNER_API_PASSWORD: ${{ secrets.HETZNER_ROBOT_PASSWORD }}
         run: |
           python3 << 'EOF'
           import requests
-          import time
           import os
           import sys
           from requests.auth import HTTPBasicAuth
@@ -298,13 +282,11 @@ jobs:
           EOF
 
       - name: Wait for server to boot into rescue
-        if: github.event.inputs.auto_reboot == 'true'
         run: |
           echo "⏳ Waiting 120 seconds for server to boot into rescue mode..."
           sleep 120
 
       - name: Test SSH connectivity to rescue system
-        if: github.event.inputs.auto_reboot == 'true'
         env:
           RESCUE_PASSWORD: ${{ steps.activate-rescue.outputs.rescue_password }}
         run: |
@@ -316,7 +298,7 @@ jobs:
           sudo apt-get update && sudo apt-get install -y sshpass
 
           # Try to connect (with retries)
-          max_attempts=5
+          max_attempts=10
           attempt=1
 
           while [ $attempt -le $max_attempts ]; do
@@ -335,53 +317,103 @@ jobs:
           echo "❌ Failed to connect after $max_attempts attempts"
           exit 1
 
-      - name: Create job summary
+      - name: Set up SSH key for Ansible
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.HETZNER_BARE_METAL_GITHUB_ACTIONS_SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # Add SSH agent configuration
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_ed25519
+
+      - name: Set up Ansible vault password
+        env:
+          VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          if [ -z "$VAULT_PASSWORD" ]; then
+            echo "::error::ANSIBLE_VAULT_PASSWORD secret is not set or is empty"
+            echo "Please add the vault password as a repository secret named ANSIBLE_VAULT_PASSWORD"
+            exit 1
+          fi
+          cd ansible
+          echo "$VAULT_PASSWORD" > .vault_pass
+          chmod 600 .vault_pass
+          echo "✓ Vault password file created"
+
+      - name: Run bare metal provisioning
+        run: |
+          cd ansible
+          ansible-playbook \
+            --limit ${{ github.event.inputs.target_host }} \
+            -v \
+            playbooks/bare-metal-provision.yml
+
+      - name: Run SSH security playbook
+        if: ${{ inputs.auto_configure == true }}
+        run: |
+          cd ansible
+          ansible-playbook \
+            --limit ${{ github.event.inputs.target_host }} \
+            -v \
+            playbooks/ssh-security.yml
+
+      - name: Run Docker setup playbook
+        if: ${{ inputs.auto_configure == true }}
+        run: |
+          cd ansible
+          ansible-playbook \
+            --limit ${{ github.event.inputs.target_host }} \
+            -v \
+            playbooks/docker-setup.yml
+
+      - name: Run Beszel agent setup playbook
+        if: ${{ inputs.auto_configure == true }}
+        run: |
+          cd ansible
+          ansible-playbook \
+            --limit ${{ github.event.inputs.target_host }} \
+            -v \
+            playbooks/beszel-agent-setup.yml
+
+      - name: Generate provisioning summary
         if: always()
         env:
           RESCUE_PASSWORD: ${{ steps.activate-rescue.outputs.rescue_password }}
         run: |
-          cat << 'SUMMARY' >> $GITHUB_STEP_SUMMARY
-          ## Rescue Mode Activation
-
-          **Target Host:** ${{ github.event.inputs.target_host }}
-          **Server IP:** ${{ steps.get-ip.outputs.server_ip }}
-          **Rescue OS:** ${{ github.event.inputs.rescue_os }}
-          **Architecture:** ${{ github.event.inputs.arch }}
-          **Auto Reboot:** ${{ github.event.inputs.auto_reboot }}
-
-          SUMMARY
+          echo "## Provision and Configure Summary" >> $GITHUB_STEP_SUMMARY
+          echo "**Target Host:** ${{ github.event.inputs.target_host }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Server IP:** ${{ steps.get-ip.outputs.server_ip }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Auto Configure:** ${{ inputs.auto_configure }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
 
           if [ "${{ steps.activate-rescue.outputs.success }}" == "true" ]; then
-            cat << SUMMARY >> $GITHUB_STEP_SUMMARY
-          ### ✅ Status: Success
-
-          **Rescue Password:** \`$RESCUE_PASSWORD\`
-
-          ⚠️ **SAVE THIS PASSWORD!** You will need it to SSH into the rescue system.
-
-          ### Next Steps
-
-          SSH into the rescue system:
-          \`\`\`bash
-          ssh root@${{ steps.get-ip.outputs.server_ip }}
-          # Use the password above when prompted
-          \`\`\`
-
-          Run the provisioning script:
-          \`\`\`bash
-          HOSTNAME="${{ github.event.inputs.target_host }}"
-          DRIVE="nvme0n1"  # or "sda" for SATA drives
-
-          curl -fsSL https://raw.githubusercontent.com/dolr-ai/hetzner-bare-metal-fleet/refs/heads/main/init.sh | MACHINE_HOSTNAME="\$HOSTNAME" DRIVE_TO_USE="\$DRIVE" bash
-
-          # After installation completes, reboot
-          reboot
-          \`\`\`
-          SUMMARY
-          else
-            cat << SUMMARY >> $GITHUB_STEP_SUMMARY
-          ### ❌ Status: Failed
-
-          Check the logs above for error details.
-          SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Rescue Password" >> $GITHUB_STEP_SUMMARY
+            echo "\`$RESCUE_PASSWORD\`" >> $GITHUB_STEP_SUMMARY
           fi
+
+          if [ -f ansible/ansible.log ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Ansible Log Summary" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            tail -20 ansible/ansible.log >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload Ansible logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: provision-${{ github.event.inputs.target_host }}-${{ github.run_id }}
+          path: |
+            ansible/ansible.log
+          retention-days: 30
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Provisioning failed for: ${{ github.event.inputs.target_host }}"
+          echo "Check the logs and artifacts for more details."

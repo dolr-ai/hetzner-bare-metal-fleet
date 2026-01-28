@@ -205,62 +205,102 @@ visudo
 hostnamectl set-hostname <new-hostname>
 ```
 
-## Manual Provisioning via GitHub Actions
+## GitHub Actions Workflows
 
-This repository uses GitHub Actions for automated bare metal provisioning. Provisioning must be triggered manually.
+This repository uses GitHub Actions for automated server provisioning and fleet maintenance.
 
-### Prerequisites for Provisioning
+### Provision and Configure (New Servers)
 
-1. Server must be in **Hetzner rescue mode**
-2. Server must be added to `ansible/inventory/hosts.yml`
-3. SSH key must be configured in GitHub secrets (`HETZNER_BARE_METAL_GITHUB_ACTIONS_SSH_PRIVATE_KEY`)
-4. Ansible vault password must be configured in GitHub secrets (`ANSIBLE_VAULT_PASSWORD`)
+**Workflow:** `provision-and-configure.yml`
 
-### Triggering Provisioning via GitHub UI
+Provisions a new bare metal server from scratch. This workflow:
+1. Activates Hetzner rescue mode via API
+2. Reboots the server into rescue mode
+3. Installs Ubuntu 24.04 with btrfs RAID0
+4. Configures SSH security, Docker, and Beszel monitoring
 
-1. Go to the **Actions** tab in the GitHub repository
-2. Select the **"Provision Bare Metal Servers"** workflow from the left sidebar
-3. Click the **"Run workflow"** dropdown button (top right)
-4. Fill in the required inputs:
-   - **target_hosts**: Hostname(s) to provision (comma-separated for multiple, e.g., `airflow-1` or `vault-1,vault-2`)
-   - **drive_type**: Select the drive type (`nvme0n1` for NVMe drives or `sda` for SATA drives)
-   - **skip_provisioning_check**: Leave unchecked unless you know what you're doing
-5. Click **"Run workflow"** to start provisioning
+**Prerequisites:**
+1. Server must be added to `ansible/inventory/hosts.yml`
+2. Beszel agent token must be encrypted in `ansible/inventory/host_vars/{hostname}.yml`
+3. Required GitHub secrets must be configured:
+   - `HETZNER_ROBOT_USER` - Hetzner Robot API username
+   - `HETZNER_ROBOT_PASSWORD` - Hetzner Robot API password
+   - `HETZNER_BARE_METAL_GITHUB_ACTIONS_SSH_PRIVATE_KEY` - SSH private key
+   - `ANSIBLE_VAULT_PASSWORD` - Ansible vault password
 
-### Triggering Provisioning via GitHub CLI
+**Triggering via GitHub UI:**
+1. Go to **Actions** → **Provision and Configure Bare Metal Server**
+2. Click **"Run workflow"**
+3. Fill in:
+   - **target_host**: Single hostname (e.g., `airflow-1`)
+   - **additional_ssh_keys**: Optional team member SSH keys
+   - **auto_configure**: Enable post-provision configuration (default: true)
+4. Click **"Run workflow"**
 
-Install the [GitHub CLI](https://cli.github.com/) and authenticate, then run:
-
+**Triggering via GitHub CLI:**
 ```bash
-# Provision a single host
-gh workflow run "Provision Bare Metal Servers" \
-  -f target_hosts="airflow-1" \
-  -f drive_type="nvme0n1"
+# Provision a single server
+gh workflow run "Provision and Configure Bare Metal Server" \
+  -f target_host="airflow-1" \
+  -f auto_configure=true
 
-# Provision multiple hosts
-gh workflow run "Provision Bare Metal Servers" \
-  -f target_hosts="vault-1,vault-2,vault-3" \
-  -f drive_type="nvme0n1"
-
-# With SATA drives
-gh workflow run "Provision Bare Metal Servers" \
-  -f target_hosts="low-traffic-1" \
-  -f drive_type="sda"
+# With additional SSH keys
+gh workflow run "Provision and Configure Bare Metal Server" \
+  -f target_host="vault-1" \
+  -f additional_ssh_keys="all"
 ```
 
-### Monitoring Provisioning Progress
+**Important Notes:**
+- Disk auto-detection: Automatically selects the first available disk (nvme0n1 or sda)
+- Servers have 2 identical disks: first for OS, second added to btrfs RAID0
+- RAID0 provides combined capacity but **no redundancy** (data loss if either disk fails)
+
+### Fleet Maintenance (Ongoing Management)
+
+**Workflow:** `fleet-maintenance.yml`
+
+Manages ongoing server maintenance across the fleet. Runs weekly on Sundays at 2 AM UTC, or can be triggered manually.
+
+**What it does:**
+- System updates and upgrades
+- SSH security audits and configuration
+- Docker installation (if missing)
+- Beszel agent setup/updates
+
+**Triggering via GitHub UI:**
+1. Go to **Actions** → **Fleet Maintenance**
+2. Click **"Run workflow"**
+3. Fill in:
+   - **target_hosts**: `all` or specific hostname(s)
+   - **run_ssh_security**: Enable SSH security playbook (default: true)
+   - **run_docker_setup**: Enable Docker setup playbook (default: true)
+   - **run_system_update**: Enable system updates (default: true)
+   - **run_beszel_agent**: Enable Beszel agent setup (default: true)
+   - **enable_reboot**: Allow automatic reboot if required (default: false)
+4. Click **"Run workflow"**
+
+**Triggering via GitHub CLI:**
+```bash
+# Run all maintenance on all servers
+gh workflow run "Fleet Maintenance" \
+  -f target_hosts="all"
+
+# Run only system updates on specific hosts
+gh workflow run "Fleet Maintenance" \
+  -f target_hosts="vault-1,vault-2" \
+  -f run_ssh_security=false \
+  -f run_docker_setup=false \
+  -f run_beszel_agent=false \
+  -f run_system_update=true \
+  -f enable_reboot=true
+```
+
+### Monitoring Workflow Progress
 
 1. Go to the **Actions** tab
 2. Click on the running workflow
-3. Click on the **"Provision Servers"** job to see real-time logs
-4. Check the **Summary** tab for pre-provisioning checks and final status
-
-### What the Provisioning Workflow Does
-
-1. **Pre-provisioning checks**: Verifies servers are in rescue mode and accessible
-2. **Bare metal provisioning**: Installs Ubuntu 24.04 with btrfs filesystem
-3. **System setup**: Runs system updates, SSH security, and Docker installation
-4. **Logs**: Uploads Ansible logs as artifacts for troubleshooting
+3. View real-time logs in the job details
+4. Check the **Summary** tab for status and logs
 
 ## Ansible Playbooks
 
