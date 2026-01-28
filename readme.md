@@ -235,14 +235,20 @@ Provisions a new bare metal server from scratch. This workflow:
    - **target_host**: Single hostname (e.g., `airflow-1`)
    - **additional_ssh_keys**: Optional team member SSH keys
    - **auto_configure**: Enable post-provision configuration (default: true)
+   - **force_provision**: Force re-provisioning even if already provisioned (default: false, ⚠️ DESTRUCTIVE)
 4. Click **"Run workflow"**
 
 **Triggering via GitHub CLI:**
 ```bash
-# Provision a single server
+# Provision a new server
 gh workflow run "Provision and Configure Bare Metal Server" \
   -f target_host="airflow-1" \
   -f auto_configure=true
+
+# Re-provision an existing server (DESTRUCTIVE - wipes all data)
+gh workflow run "Provision and Configure Bare Metal Server" \
+  -f target_host="vault-1" \
+  -f force_provision=true
 
 # With additional SSH keys
 gh workflow run "Provision and Configure Bare Metal Server" \
@@ -250,10 +256,12 @@ gh workflow run "Provision and Configure Bare Metal Server" \
   -f additional_ssh_keys="all"
 ```
 
-**Important Notes:**
-- Disk auto-detection: Automatically selects the first available disk (nvme0n1 or sda)
-- Servers have 2 identical disks: first for OS, second added to btrfs RAID0
-- RAID0 provides combined capacity but **no redundancy** (data loss if either disk fails)
+**⚠️ Important Notes:**
+- **Authentication**: Uses SSH key authentication only (no passwords)
+- **Rescue mode**: The workflow automatically activates rescue mode via Hetzner API and reboots the server
+- **Already-provisioned servers**: By default, the workflow will FAIL if the server is already provisioned to prevent accidental data loss. Use `force_provision: true` to override (⚠️ this will DESTROY all data)
+- **Disk detection**: Automatically detects and uses the first available disk (nvme0n1 or sda)
+- **RAID0 configuration**: Servers have 2 identical disks; first for OS, second added to btrfs RAID0 (striped for capacity, **no redundancy** - data loss if either disk fails)
 
 ### Fleet Maintenance (Ongoing Management)
 

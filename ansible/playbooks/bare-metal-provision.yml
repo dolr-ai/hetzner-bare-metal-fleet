@@ -4,6 +4,7 @@
   gather_facts: false
   vars:
     provision_marker: "/root/.provisioned"
+    force_provision: false
 
   tasks:
     - name: Check if server is already provisioned
@@ -13,9 +14,33 @@
       failed_when: false
       ignore_errors: true
 
-    - name: Skip already provisioned hosts
-      ansible.builtin.meta: end_host
-      when: provision_check.stdout is defined and provision_check.stdout | trim == 'provisioned'
+    - name: Fail if already provisioned (unless force_provision is true)
+      ansible.builtin.fail:
+        msg: |
+          ⚠️  Server {{ inventory_hostname }} is already provisioned!
+
+          The provision marker file {{ provision_marker }} exists, indicating this server
+          has already been provisioned. Re-provisioning will DESTROY all data on the server.
+
+          If you want to re-provision this server anyway, run the workflow with:
+          force_provision: true
+
+          This will wipe the server and install a fresh Ubuntu 24.04 system.
+      when:
+        - provision_check.stdout is defined
+        - provision_check.stdout | trim == 'provisioned'
+        - not (force_provision | bool)
+
+    - name: Warning - Force provisioning enabled
+      ansible.builtin.debug:
+        msg: |
+          ⚠️  WARNING: Force provisioning is ENABLED!
+          Server {{ inventory_hostname }} will be re-provisioned.
+          ALL DATA WILL BE DESTROYED!
+      when:
+        - provision_check.stdout is defined
+        - provision_check.stdout | trim == 'provisioned'
+        - force_provision | bool
 
     - name: Check if in rescue system
       ansible.builtin.raw: "test -f /root/.oldroot/nfs/install/installimage && echo 'rescue' || echo 'not_rescue'"

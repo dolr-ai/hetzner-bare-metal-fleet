@@ -30,6 +30,11 @@ on:
         required: false
         default: true
         type: boolean
+      force_provision:
+        description: "Force provisioning even if server is already provisioned (DESTRUCTIVE)"
+        required: false
+        default: false
+        type: boolean
 
 env:
   ANSIBLE_HOST_KEY_CHECKING: False
@@ -216,24 +221,16 @@ jobs:
               response.raise_for_status()
               result = response.json()
               
-              # Extract rescue password
-              rescue_password = result.get('rescue', {}).get('password')
-              
-              if rescue_password:
+              # Verify rescue mode was activated
+              if result.get('rescue', {}).get('active'):
                   print(f"✅ Rescue mode activated successfully!")
                   print(f"Server IP: {server_ip}")
                   
-                  # Mask the password in logs but save it for job summary
-                  print(f"::add-mask::{rescue_password}")
-                  
-                  # Output to GitHub Actions (will be masked)
+                  # Output to GitHub Actions
                   with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-                      f.write(f"rescue_password={rescue_password}\n")
                       f.write(f"success=true\n")
-                  
-                  print("\n⚠️  IMPORTANT: Save the rescue password from the job summary!")
               else:
-                  print("❌ Failed to get rescue password from API response")
+                  print("❌ Failed to activate rescue mode")
                   print(f"Response: {json.dumps(result, indent=2)}")
                   sys.exit(1)
                   
@@ -286,37 +283,6 @@ jobs:
           echo "⏳ Waiting 120 seconds for server to boot into rescue mode..."
           sleep 120
 
-      - name: Test SSH connectivity to rescue system
-        env:
-          RESCUE_PASSWORD: ${{ steps.activate-rescue.outputs.rescue_password }}
-        run: |
-          server_ip="${{ steps.get-ip.outputs.server_ip }}"
-
-          echo "Testing SSH connectivity to rescue system..."
-
-          # Install sshpass for password authentication
-          sudo apt-get update && sudo apt-get install -y sshpass
-
-          # Try to connect (with retries)
-          max_attempts=10
-          attempt=1
-
-          while [ $attempt -le $max_attempts ]; do
-            echo "Attempt $attempt/$max_attempts..."
-            
-            if sshpass -p "$RESCUE_PASSWORD" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@$server_ip "echo 'Connected to rescue system'; uname -a"; then
-              echo "✅ Successfully connected to rescue system!"
-              exit 0
-            fi
-            
-            echo "Connection failed, waiting 30 seconds..."
-            sleep 30
-            attempt=$((attempt + 1))
-          done
-
-          echo "❌ Failed to connect after $max_attempts attempts"
-          exit 1
-
       - name: Set up SSH key for Ansible
         env:
           SSH_PRIVATE_KEY: ${{ secrets.HETZNER_BARE_METAL_GITHUB_ACTIONS_SSH_PRIVATE_KEY }}
@@ -327,6 +293,53 @@ jobs:
           # Add SSH agent configuration
           eval "$(ssh-agent -s)"
           ssh-add ~/.ssh/id_ed25519
+
+      - name: Test SSH connectivity to rescue system
+        run: |
+          server_ip="${{ steps.get-ip.outputs.server_ip }}"
+
+          echo "Testing SSH connectivity to rescue system..."
+
+          # Try to connect using SSH key (with retries)
+          max_attempts=10
+          attempt=1
+
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt/$max_attempts..."
+            
+            # First check if we can connect at all
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=yes root@$server_ip "echo 'SSH connection successful'"; then
+              # Check if we're in rescue mode
+              if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=yes root@$server_ip "test -f /root/.oldroot/nfs/install/installimage"; then
+                echo "✅ Successfully connected to rescue system!"
+                ssh -o StrictHostKeyChecking=no root@$server_ip "uname -a"
+                exit 0
+              else
+                echo "❌ Server is accessible but NOT in rescue mode!"
+                echo "The server appears to be running the installed OS."
+                echo ""
+                echo "To fix this:"
+                echo "1. Go to Hetzner Robot panel: https://robot.hetzner.com/"
+                echo "2. Select server: $server_ip"
+                echo "3. Go to 'Rescue' tab and activate Linux rescue system"
+                echo "4. Go to 'Reset' tab and trigger a hardware reset"
+                echo "5. Wait 2-3 minutes for the server to boot into rescue mode"
+                echo "6. Re-run this workflow"
+                exit 1
+              fi
+            fi
+            
+            echo "Connection failed, waiting 30 seconds..."
+            sleep 30
+            attempt=$((attempt + 1))
+          done
+
+          echo "❌ Failed to connect after $max_attempts attempts"
+          echo "Server is not accessible via SSH. Please check:"
+          echo "1. Server is powered on"
+          echo "2. Network connectivity is working"
+          echo "3. SSH keys are properly configured in Hetzner Robot"
+          exit 1
 
       - name: Set up Ansible vault password
         env:
@@ -348,6 +361,7 @@ jobs:
           ansible-playbook \
             --limit ${{ github.event.inputs.target_host }} \
             -v \
+            ${{ github.event.inputs.force_provision == 'true' && '-e force_provision=true' || '' }} \
             playbooks/bare-metal-provision.yml
 
       - name: Run SSH security playbook
@@ -379,25 +393,14 @@ jobs:
 
       - name: Generate provisioning summary
         if: always()
-        env:
-          RESCUE_PASSWORD: ${{ steps.activate-rescue.outputs.rescue_password }}
         run: |
           echo "## Provision and Configure Summary" >> $GITHUB_STEP_SUMMARY
           echo "**Target Host:** ${{ github.event.inputs.target_host }}" >> $GITHUB_STEP_SUMMARY
           echo "**Server IP:** ${{ steps.get-ip.outputs.server_ip }}" >> $GITHUB_STEP_SUMMARY
           echo "**Auto Configure:** ${{ inputs.auto_configure }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Force Provision:** ${{ inputs.force_provision }}" >> $GITHUB_STEP_SUMMARY
           echo "**Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
           echo "**Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
-
-          if [ "${{ steps.activate-rescue.outputs.success }}" == "true" ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### Rescue Password" >> $GITHUB_STEP_SUMMARY
-            echo "\`$RESCUE_PASSWORD\`" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          if [ -f ansible/ansible.log ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### Ansible Log Summary" >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
             tail -20 ansible/ansible.log >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
