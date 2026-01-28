@@ -1,13 +1,7 @@
-name: Provision New Bare Metal Servers
+name: Provision Bare Metal Servers
 
 on:
-  # Trigger when hosts.yml is modified
-  push:
-    branches: [main]
-    paths:
-      - "ansible/inventory/hosts.yml"
-
-  # Manual trigger for specific hosts
+  # Manual trigger only
   workflow_dispatch:
     inputs:
       target_hosts:
@@ -31,85 +25,11 @@ on:
 env:
   ANSIBLE_HOST_KEY_CHECKING: False
   ANSIBLE_FORCE_COLOR: True
-  PROVISIONED_HOSTS_FILE: .github/.provisioned-hosts
 
 jobs:
-  detect-new-hosts:
-    name: Detect New Hosts
-    runs-on: ubuntu-latest
-    outputs:
-      new_hosts: ${{ steps.find-new.outputs.hosts }}
-      has_new_hosts: ${{ steps.find-new.outputs.has_new }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 2 # Need previous commit to compare
-
-      - name: Restore provisioned hosts cache
-        uses: actions/cache@v3
-        with:
-          path: ${{ env.PROVISIONED_HOSTS_FILE }}
-          key: provisioned-hosts-${{ github.sha }}
-          restore-keys: |
-            provisioned-hosts-
-
-      - name: Create provisioned hosts file if not exists
-        run: |
-          mkdir -p .github
-          touch ${{ env.PROVISIONED_HOSTS_FILE }}
-
-      - name: Find new hosts
-        id: find-new
-        run: |
-          # Extract all hostnames from current hosts.yml
-          current_hosts=$(yq eval '.all.children.bare_metal.hosts | keys | .[]' ansible/inventory/hosts.yml)
-
-          # Read already provisioned hosts
-          if [ -f "${{ env.PROVISIONED_HOSTS_FILE }}" ]; then
-            provisioned_hosts=$(cat ${{ env.PROVISIONED_HOSTS_FILE }})
-          else
-            provisioned_hosts=""
-          fi
-
-          # Find new hosts (in current but not in provisioned)
-          new_hosts=""
-          for host in $current_hosts; do
-            if ! echo "$provisioned_hosts" | grep -q "^${host}$"; then
-              if [ -z "$new_hosts" ]; then
-                new_hosts="$host"
-              else
-                new_hosts="$new_hosts,$host"
-              fi
-            fi
-          done
-
-          if [ -n "$new_hosts" ]; then
-            echo "has_new=true" >> $GITHUB_OUTPUT
-            echo "hosts=$new_hosts" >> $GITHUB_OUTPUT
-            echo "::notice::New hosts detected: $new_hosts"
-          else
-            echo "has_new=false" >> $GITHUB_OUTPUT
-            echo "hosts=" >> $GITHUB_OUTPUT
-            echo "::notice::No new hosts detected"
-          fi
-
-      - name: Display detection results
-        run: |
-          echo "## New Hosts Detection" >> $GITHUB_STEP_SUMMARY
-          echo "**Has New Hosts:** ${{ steps.find-new.outputs.has_new }}" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ steps.find-new.outputs.has_new }}" == "true" ]; then
-            echo "**New Hosts:** ${{ steps.find-new.outputs.hosts }}" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "⚠️ **IMPORTANT:** These servers must be in Hetzner rescue mode before provisioning!" >> $GITHUB_STEP_SUMMARY
-          fi
-
   provision-servers:
     name: Provision Servers
     runs-on: ubuntu-latest
-    needs: detect-new-hosts
-    if: needs.detect-new-hosts.outputs.has_new_hosts == 'true' || github.event_name == 'workflow_dispatch'
     timeout-minutes: 120
 
     steps:
@@ -154,13 +74,8 @@ jobs:
       - name: Determine target hosts
         id: target
         run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "hosts=${{ inputs.target_hosts }}" >> $GITHUB_OUTPUT
-            echo "drive=${{ inputs.drive_type }}" >> $GITHUB_OUTPUT
-          else
-            echo "hosts=${{ needs.detect-new-hosts.outputs.new_hosts }}" >> $GITHUB_OUTPUT
-            echo "drive=nvme0n1" >> $GITHUB_OUTPUT
-          fi
+          echo "hosts=${{ inputs.target_hosts }}" >> $GITHUB_OUTPUT
+          echo "drive=${{ inputs.drive_type }}" >> $GITHUB_OUTPUT
 
       - name: Test connectivity to target hosts
         run: |
@@ -198,33 +113,6 @@ jobs:
             -e "drive_to_use=${{ steps.target.outputs.drive }}" \
             -v \
             playbooks/bare-metal-provision.yml
-
-      - name: Mark hosts as provisioned
-        if: success()
-        run: |
-          mkdir -p .github
-          targets="${{ steps.target.outputs.hosts }}"
-          IFS=',' read -ra HOSTS <<< "$targets"
-          for host in "${HOSTS[@]}"; do
-            echo "$host" >> ${{ env.PROVISIONED_HOSTS_FILE }}
-          done
-          sort -u ${{ env.PROVISIONED_HOSTS_FILE }} -o ${{ env.PROVISIONED_HOSTS_FILE }}
-
-      - name: Save provisioned hosts cache
-        if: success()
-        uses: actions/cache/save@v3
-        with:
-          path: ${{ env.PROVISIONED_HOSTS_FILE }}
-          key: provisioned-hosts-${{ github.sha }}
-
-      - name: Commit provisioned hosts list
-        if: success() && github.event_name != 'workflow_dispatch'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add ${{ env.PROVISIONED_HOSTS_FILE }}
-          git diff-index --quiet HEAD || git commit -m "chore: update provisioned hosts [skip ci]"
-          git push
 
       - name: Generate provisioning summary
         if: always()

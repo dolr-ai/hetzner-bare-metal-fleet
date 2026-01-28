@@ -205,6 +205,63 @@ visudo
 hostnamectl set-hostname <new-hostname>
 ```
 
+## Manual Provisioning via GitHub Actions
+
+This repository uses GitHub Actions for automated bare metal provisioning. Provisioning must be triggered manually.
+
+### Prerequisites for Provisioning
+
+1. Server must be in **Hetzner rescue mode**
+2. Server must be added to `ansible/inventory/hosts.yml`
+3. SSH key must be configured in GitHub secrets (`HETZNER_BARE_METAL_GITHUB_ACTIONS_SSH_PRIVATE_KEY`)
+4. Ansible vault password must be configured in GitHub secrets (`ANSIBLE_VAULT_PASSWORD`)
+
+### Triggering Provisioning via GitHub UI
+
+1. Go to the **Actions** tab in the GitHub repository
+2. Select the **"Provision Bare Metal Servers"** workflow from the left sidebar
+3. Click the **"Run workflow"** dropdown button (top right)
+4. Fill in the required inputs:
+   - **target_hosts**: Hostname(s) to provision (comma-separated for multiple, e.g., `airflow-1` or `vault-1,vault-2`)
+   - **drive_type**: Select the drive type (`nvme0n1` for NVMe drives or `sda` for SATA drives)
+   - **skip_provisioning_check**: Leave unchecked unless you know what you're doing
+5. Click **"Run workflow"** to start provisioning
+
+### Triggering Provisioning via GitHub CLI
+
+Install the [GitHub CLI](https://cli.github.com/) and authenticate, then run:
+
+```bash
+# Provision a single host
+gh workflow run "Provision Bare Metal Servers" \
+  -f target_hosts="airflow-1" \
+  -f drive_type="nvme0n1"
+
+# Provision multiple hosts
+gh workflow run "Provision Bare Metal Servers" \
+  -f target_hosts="vault-1,vault-2,vault-3" \
+  -f drive_type="nvme0n1"
+
+# With SATA drives
+gh workflow run "Provision Bare Metal Servers" \
+  -f target_hosts="low-traffic-1" \
+  -f drive_type="sda"
+```
+
+### Monitoring Provisioning Progress
+
+1. Go to the **Actions** tab
+2. Click on the running workflow
+3. Click on the **"Provision Servers"** job to see real-time logs
+4. Check the **Summary** tab for pre-provisioning checks and final status
+
+### What the Provisioning Workflow Does
+
+1. **Pre-provisioning checks**: Verifies servers are in rescue mode and accessible
+2. **Bare metal provisioning**: Installs Ubuntu 24.04 with btrfs filesystem
+3. **System setup**: Runs system updates, SSH security, and Docker installation
+4. **Logs**: Uploads Ansible logs as artifacts for troubleshooting
+
 ## Ansible Playbooks
 
 This repository includes Ansible playbooks for managing the fleet:
