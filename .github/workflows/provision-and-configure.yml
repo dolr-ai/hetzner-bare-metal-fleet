@@ -401,6 +401,10 @@ jobs:
           echo "**Force Provision:** ${{ inputs.force_provision }}" >> $GITHUB_STEP_SUMMARY
           echo "**Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
           echo "**Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f ansible/ansible.log ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Ansible Log Summary" >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
             tail -20 ansible/ansible.log >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
