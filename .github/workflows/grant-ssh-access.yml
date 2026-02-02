@@ -58,13 +58,10 @@ jobs:
             
             # Extract SSH key from vault
             mkdir -p ~/.ssh
-            cd ansible
-            ansible localhost -m debug -a "var=github_actions_ssh_private_key" -e @group_vars/all/vars.yml -e @group_vars/all/vault.yml 2>/dev/null | grep -A 100 '"github_actions_ssh_private_key":' | tail -n +2 | sed 's/^[[:space:]]*//' | sed 's/"//g' > ~/.ssh/id_ed25519
+            ansible-vault view ansible/group_vars/all/vault.yml | awk '/vault_github_actions_ssh_private_key:/,/-----END OPENSSH PRIVATE KEY-----/' | tail -n +2 | sed 's/^  //' > ~/.ssh/id_ed25519
             chmod 600 ~/.ssh/id_ed25519
             
-            # Continue in ansible directory
-            
             # Grant SSH access
-            ansible-playbook -i inventory/hosts.yml playbooks/hetzner-ssh-key-grant.yml \
+            ansible-playbook ansible/playbooks/hetzner-ssh-key-grant.yml \
               --limit "${{ inputs.target_host }}" \
               --extra-vars "team_member_name=${{ inputs.team_member }}"

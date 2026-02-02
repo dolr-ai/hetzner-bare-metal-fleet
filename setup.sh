@@ -54,13 +54,38 @@ else
     exit 1
 fi
 
+# Extract SSH key from vault
+echo ""
+echo "Setting up SSH key for server access..."
+SSH_KEY_PATH="$HOME/.ssh/id_ed25519"
+
+if [ -f "$SSH_KEY_PATH" ]; then
+    echo "⚠️  SSH key already exists at $SSH_KEY_PATH"
+    read -p "Overwrite with key from vault? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Skipping SSH key extraction"
+    else
+        mkdir -p ~/.ssh
+        ansible-vault view ansible/group_vars/all/vault.yml | awk '/vault_github_actions_ssh_private_key:/,/-----END OPENSSH PRIVATE KEY-----/' | tail -n +2 | sed 's/^  //' > "$SSH_KEY_PATH"
+        chmod 600 "$SSH_KEY_PATH"
+        echo "✓ SSH key extracted from vault and saved to $SSH_KEY_PATH"
+    fi
+else
+    mkdir -p ~/.ssh
+    ansible-vault view ansible/group_vars/all/vault.yml | awk '/vault_github_actions_ssh_private_key:/,/-----END OPENSSH PRIVATE KEY-----/' | tail -n +2 | sed 's/^  //' > "$SSH_KEY_PATH"
+    chmod 600 "$SSH_KEY_PATH"
+    echo "✓ SSH key extracted from vault and saved to $SSH_KEY_PATH"
+fi
+
 echo ""
 echo "========================================="
 echo "Setup complete! 🚀"
 echo "========================================="
 echo ""
 echo "You can now:"
-echo "  • Run playbooks locally: cd ansible && ansible-playbook ..."
+echo "  • Run playbooks: ansible-playbook ansible/playbooks/<playbook>.yml"
 echo "  • Use the helper script: ./scripts/run-local.sh"
 echo "  • Edit vault secrets: ansible-vault edit ansible/group_vars/all/vault.yml"
+echo "  • Test connectivity: ansible all -m ping"
 echo ""

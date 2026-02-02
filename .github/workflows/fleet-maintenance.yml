@@ -76,11 +76,8 @@ jobs:
             
             # Extract SSH key from vault
             mkdir -p ~/.ssh
-            cd ansible
-            ansible localhost -m debug -a "var=github_actions_ssh_private_key" -e @group_vars/all/vars.yml -e @group_vars/all/vault.yml 2>/dev/null | grep -A 100 '"github_actions_ssh_private_key":' | tail -n +2 | sed 's/^[[:space:]]*//' | sed 's/"//g' > ~/.ssh/id_ed25519
+            ansible-vault view ansible/group_vars/all/vault.yml | awk '/vault_github_actions_ssh_private_key:/,/-----END OPENSSH PRIVATE KEY-----/' | tail -n +2 | sed 's/^  //' > ~/.ssh/id_ed25519
             chmod 600 ~/.ssh/id_ed25519
-            
-            # Continue in ansible directory
             
             # Determine target hosts
             TARGET="${{ inputs.target_hosts }}"
@@ -90,25 +87,25 @@ jobs:
             
             # Run system updates
             if [ "${{ inputs.run_system_update }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
-              ansible-playbook -i inventory/hosts.yml playbooks/system-update.yml \
+              ansible-playbook ansible/playbooks/system-update.yml \
                 --limit "$TARGET" \
                 --extra-vars "enable_reboot=${{ inputs.enable_reboot }}"
             fi
             
             # Configure SSH security
             if [ "${{ inputs.run_ssh_security }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
-              ansible-playbook -i inventory/hosts.yml playbooks/ssh-security.yml \
+              ansible-playbook ansible/playbooks/ssh-security.yml \
                 --limit "$TARGET"
             fi
             
             # Install/update Docker
             if [ "${{ inputs.run_docker_setup }}" = "true" ]; then
-              ansible-playbook -i inventory/hosts.yml playbooks/docker-setup.yml \
+              ansible-playbook ansible/playbooks/docker-setup.yml \
                 --limit "$TARGET"
             fi
             
             # Deploy/update Beszel agent
             if [ "${{ inputs.run_beszel_agent }}" = "true" ]; then
-              ansible-playbook -i inventory/hosts.yml playbooks/beszel-agent-setup.yml \
+              ansible-playbook ansible/playbooks/beszel-agent-setup.yml \
                 --limit "$TARGET"
             fi

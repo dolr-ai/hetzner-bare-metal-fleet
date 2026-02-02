@@ -37,6 +37,6 @@ team_members:
 # Canonical SSH keys (always included)
 canonical_ssh_keys:
   - name: "github-actions@yral.com"
-    key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJiePbl4hA23f3RUCUW/g0iWfnvDqGh1gvMPV5GK8WH5 github-actions@yral.com"
+    key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIM/H7Jp2RgC1xtg1nyzpmhzOTmUz3n+PQPsk83BzUskg github-actions@yral.com"
   - name: "saikatdas0790@gmail.com"
     key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMTd7U+HxxqwNvvp81WvGMpU6ypsBGPKZLHMcq4SgGBR saikatdas0790@gmail.com"

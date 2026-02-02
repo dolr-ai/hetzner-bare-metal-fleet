@@ -63,9 +63,8 @@ scripts/
 
 **Direct playbook execution:**
 ```bash
-cd ansible
-ansible-playbook -i inventory/hosts.yml playbooks/bare-metal-provision.yml --limit airflow-1
-ansible-playbook -i inventory/hosts.yml playbooks/docker-setup.yml --limit all
+ansible-playbook ansible/playbooks/bare-metal-provision.yml --limit airflow-1
+ansible-playbook ansible/playbooks/docker-setup.yml --limit all
 ```
 
 ### GitHub Actions
@@ -153,10 +152,10 @@ ansible-vault view ansible/group_vars/all/vault.yml
 
 ```bash
 # Test all hosts
-ansible all -i ansible/inventory/hosts.yml -m ping --limit hostname
+ansible all -m ping --limit hostname
 
 # Verify inventory
-ansible-inventory -i ansible/inventory/hosts.yml --list
+ansible-inventory --list
 ```
 
 ## Adding New Servers

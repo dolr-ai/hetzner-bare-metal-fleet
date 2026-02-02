@@ -58,20 +58,17 @@ jobs:
             
             # Extract SSH key from vault
             mkdir -p ~/.ssh
-            cd ansible
-            ansible localhost -m debug -a "var=github_actions_ssh_private_key" -e @group_vars/all/vars.yml -e @group_vars/all/vault.yml 2>/dev/null | grep -A 100 '"github_actions_ssh_private_key":' | tail -n +2 | sed 's/^[[:space:]]*//' | sed 's/"//g' > ~/.ssh/id_ed25519
+            ansible-vault view ansible/group_vars/all/vault.yml | awk '/vault_github_actions_ssh_private_key:/,/-----END OPENSSH PRIVATE KEY-----/' | tail -n +2 | sed 's/^  //' > ~/.ssh/id_ed25519
             chmod 600 ~/.ssh/id_ed25519
             
-            # Continue in ansible directory
-            
             # Run bare metal provisioning
-            ansible-playbook -i inventory/hosts.yml playbooks/bare-metal-provision.yml \
+            ansible-playbook ansible/playbooks/bare-metal-provision.yml \
               --limit "${{ inputs.target_host }}" \
               --extra-vars "force_provision=${{ inputs.force_provision }}"
             
             # Run post-provision configuration if requested
             if [ "${{ inputs.auto_configure }}" = "true" ]; then
-              ansible-playbook -i inventory/hosts.yml playbooks/ssh-security.yml --limit "${{ inputs.target_host }}"
-              ansible-playbook -i inventory/hosts.yml playbooks/docker-setup.yml --limit "${{ inputs.target_host }}"
-              ansible-playbook -i inventory/hosts.yml playbooks/beszel-agent-setup.yml --limit "${{ inputs.target_host }}"
+              ansible-playbook ansible/playbooks/ssh-security.yml --limit "${{ inputs.target_host }}"
+              ansible-playbook ansible/playbooks/docker-setup.yml --limit "${{ inputs.target_host }}"
+              ansible-playbook ansible/playbooks/beszel-agent-setup.yml --limit "${{ inputs.target_host }}"
             fi

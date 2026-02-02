@@ -64,12 +64,10 @@ run_playbook() {
     
     print_info "Running playbook: $playbook"
     
-    cd "$ANSIBLE_DIR"
-    
     if [ -n "$extra_args" ]; then
-        ansible-playbook -i inventory/hosts.yml "playbooks/$playbook" $extra_args
+        ansible-playbook "$ANSIBLE_DIR/playbooks/$playbook" $extra_args
     else
-        ansible-playbook -i inventory/hosts.yml "playbooks/$playbook"
+        ansible-playbook "$ANSIBLE_DIR/playbooks/$playbook"
     fi
 }
 
@@ -119,10 +117,9 @@ get_host_input() {
 # Encrypt all host vault files
 encrypt_all_host_vaults() {
     print_info "Encrypting all host vault files..."
-    cd "$ANSIBLE_DIR"
     
     local count=0
-    for dir in inventory/host_vars/*/; do
+    for dir in "$ANSIBLE_DIR"/inventory/host_vars/*/; do
         if [ -d "$dir" ]; then
             vault_file="${dir}vault.yml"
             if [ -f "$vault_file" ]; then
@@ -217,26 +214,22 @@ main() {
                     ;;
                 8)
                     print_info "Viewing vault contents..."
-                    cd "$ANSIBLE_DIR"
-                    ansible-vault view group_vars/all/vault.yml
+                    ansible-vault view ansible/group_vars/all/vault.yml
                     ;;
                 9)
                     print_info "Opening vault for editing..."
-                    cd "$ANSIBLE_DIR"
-                    ansible-vault edit group_vars/all/vault.yml
+                    ansible-vault edit ansible/group_vars/all/vault.yml
                     ;;
                 10)
                     encrypt_all_host_vaults
                     ;;
                 11)
                     print_info "Testing connectivity to all hosts..."
-                    cd "$ANSIBLE_DIR"
-                    ansible all -i inventory/hosts.yml -m ping
+                    ansible all -m ping
                     ;;
                 12)
                     print_info "Listing all hosts in inventory..."
-                    cd "$ANSIBLE_DIR"
-                    ansible-inventory -i inventory/hosts.yml --list
+                    ansible-inventory --list
                     ;;
                 0)
                     print_info "Exiting..."
