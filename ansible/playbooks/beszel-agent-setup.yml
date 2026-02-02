@@ -2,25 +2,14 @@
 - name: Beszel Agent Docker Compose Setup
   hosts: all
   gather_facts: true
-  max_fail_percentage: 50
   vars:
     ansible_python_interpreter: /usr/bin/python3
     docker_compose_path: /root/docker-compose.yml
     beszel_listen_port: 45876
     beszel_ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFbMj/W6oT9440QejCiVlJbnuBlWK/mCxJnzEHO1dOYq"
     beszel_hub_url: "https://beszel.yral.com"
-    retry_count: 3
-    retry_delay: 10
 
   tasks:
-    - name: Wait for system to be ready
-      wait_for_connection:
-        timeout: 60
-        delay: "{{ retry_delay }}"
-      retries: "{{ retry_count }}"
-      register: connection_result
-      until: connection_result is succeeded
-
     - name: Check if system is Debian/Ubuntu
       fail:
         msg: "This playbook is designed for Debian/Ubuntu systems only"

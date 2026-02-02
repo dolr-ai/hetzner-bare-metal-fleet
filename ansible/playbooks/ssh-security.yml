@@ -1,7 +1,7 @@
 ---
 - name: SSH Security Configuration and Audit (canonical authorized_keys replace)
   hosts: all
-  gather_facts: true
+  gather_facts: false
   become: true
   max_fail_percentage: 50
   vars:
@@ -17,6 +17,9 @@
       retries: "{{ retry_count }}"
       register: connection_result
       until: connection_result is succeeded
+
+    - name: Gather facts after connection is established
+      setup:
 
     - name: Check if system is Debian/Ubuntu
       fail:
