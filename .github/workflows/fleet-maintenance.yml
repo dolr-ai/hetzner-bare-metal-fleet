@@ -66,6 +66,9 @@ jobs:
           runCmd: |
             set -e
             
+            # Enable colored output for Ansible
+            export ANSIBLE_FORCE_COLOR=true
+            
             # Set up vault password
             echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > ansible/.vault_pass
             chmod 600 ansible/.vault_pass
