@@ -43,7 +43,6 @@ jobs:
         uses: devcontainers/ci@v0.3
         env:
           ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
-          SSH_PRIVATE_KEY: ${{ secrets.GITHUB_ACTIONS_SSH_KEY }}
           ANSIBLE_HOST_KEY_CHECKING: False
           ANSIBLE_FORCE_COLOR: True
         with:
@@ -53,17 +52,17 @@ jobs:
           runCmd: |
             set -e
             
-            # Set up SSH key
-            mkdir -p ~/.ssh
-            echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
-            chmod 600 ~/.ssh/id_ed25519
-            
             # Set up vault password
             echo "$ANSIBLE_VAULT_PASSWORD" > ansible/.vault_pass
             chmod 600 ansible/.vault_pass
             
-            # Change to ansible directory
+            # Extract SSH key from vault
+            mkdir -p ~/.ssh
             cd ansible
+            ansible localhost -m debug -a "var=github_actions_ssh_private_key" -e @group_vars/all/vars.yml -e @group_vars/all/vault.yml 2>/dev/null | grep -A 100 '"github_actions_ssh_private_key":' | tail -n +2 | sed 's/^[[:space:]]*//' | sed 's/"//g' > ~/.ssh/id_ed25519
+            chmod 600 ~/.ssh/id_ed25519
+            
+            # Continue in ansible directory
             
             # Run bare metal provisioning
             ansible-playbook -i inventory/hosts.yml playbooks/bare-metal-provision.yml \
