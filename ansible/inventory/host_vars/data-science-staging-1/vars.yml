@@ -1,0 +1,6 @@
+---
+# Variables for data-science-staging-1
+# References encrypted values from vault.yml
+
+# Beszel monitoring agent token
+beszel_agent_token: "{{ vault_data_science_staging_1_beszel_agent_token }}"

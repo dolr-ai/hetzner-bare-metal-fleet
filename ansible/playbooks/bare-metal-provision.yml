@@ -5,6 +5,15 @@
   vars:
     provision_marker: "/root/.provisioned"
     force_provision: false
+    skip_rescue_activation: false  # Set to true if already in rescue mode
+
+  pre_tasks:
+    - name: Activate rescue mode (if not skipped)
+      include_tasks: hetzner-rescue-activate.yml
+      when: not (skip_rescue_activation | bool)
+      tags:
+        - rescue
+        - provision
 
   tasks:
     - name: Check if server is already provisioned

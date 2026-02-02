@@ -3,18 +3,18 @@ name: Grant Temporary SSH Access
 on:
   workflow_dispatch:
     inputs:
-      user:
-        description: "User to grant SSH access to"
+      team_member:
+        description: "Team member to grant access"
         required: true
         type: choice
         options:
-          - Jay (jay@gobazzinga.io)
-          - Joel (joel@gobazzinga.io)
-          - Kevin (kevin@gobazzinga.io)
-          - Naitik (naitik@gobazzinga.io)
-          - Ravi (ravi@gobazzinga.io)
+          - jay
+          - joel
+          - kevin
+          - naitik
+          - ravi
       target_host:
-        description: "Target host (specific hostname from inventory, or 'all')"
+        description: "Target host (specific hostname or 'all')"
         required: true
         type: string
 
@@ -24,7 +24,7 @@ env:
 
 jobs:
   grant-access:
-    name: Grant Temporary SSH Access
+    name: Grant SSH Access
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -37,165 +37,24 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install Ansible and dependencies
+      - name: Install Ansible
         run: |
           pip install --upgrade pip
-          pip install ansible ansible-core pyyaml
+          pip install ansible ansible-core
           ansible-galaxy collection install ansible.posix community.general
 
-      - name: Map user to SSH public key
-        id: map_key
+      - name: Configure vault password
         run: |
-          case "${{ inputs.user }}" in
-            "Jay (jay@gobazzinga.io)")
-              USER_EMAIL="jay@gobazzinga.io"
-              SSH_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC4EEE0Ujs02S8QJojavczuX8DqesE3OdaATdN7/b592 jay@gobazzinga.io"
-              ;;
-            "Joel (joel@gobazzinga.io)")
-              USER_EMAIL="joel@gobazzinga.io"
-              SSH_KEY="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCfknevgb+805mjUliPsHJxbKdCePkUSkhSefgiC6uZjOltQCYo4G8H0il5l53+HNPYptqKTtKResEUBwsK7zOdfItnU9Gyp8Zqzs/GfY4ICyYGfXrgIDk/J41wkSG/0LBmnICu7gM9STETbjKZF7yLwtKlhnJyLHzAtCuH2QKNI2gV4psfsIruT4ZbYPEX0Yn1L63AoxYuOJ+ligqWvkxy91/NJE1qt2Mt9HtWnTp0nsFHfbiomGaqwEKNy+tFWiVJucLHgJ9KoYOUApI2MYn/vZVtbuU4uWz0yQfuFJwNVwDyPu14RrcbZqM8Uwg+x3YnY+sgv4671ajb1mgxh41L2SXYa1pg0wqbq1ah0BtP4aJD3rckaCSmtlfQUs2SY2+eCyLK29WtwALld+XCkFt5VtD94K2ujoOJ1SoAjCCSOYv5XLAbMcZnoa5nX9DO2UQMACRo6XbRO/DnqTCHleC6Kh735ZJNOihN3NOVYIT3nxvHPAOL6Huv+vSlDXUSAd5nMDbHj8WAC1/08LWLqcrLSiDGi4No6DAcl40cH6nF902u0khx8z9IPWBi/p5Ra2xznJG65emXJnThc3Pj29C2FQsWIlaaCOWtGoxSinic+Azp1EJBUIk0sxEsX2xW3wJboYC2MnLBYlVAy07+c6EMCrwEjexBkwJSYEIaqFOt+w== joel@gobazzinga.io"
-              ;;
-            "Kevin (kevin@gobazzinga.io)")
-              USER_EMAIL="kevin@gobazzinga.io"
-              SSH_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDeh+bxWavxerRDziQ2vFFw7isP3lC408Y1z4CbK1Thz kevin@gobazzinga.io"
-              ;;
-            "Naitik (naitik@gobazzinga.io)")
-              USER_EMAIL="naitik@gobazzinga.io"
-              SSH_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEiXkPkZghjS+QfvScVTFRsUZCh7ibH80bb/ls4ddJHs naitik@gobazzinga.io"
-              ;;
-            "Ravi (ravi@gobazzinga.io)")
-              USER_EMAIL="ravi@gobazzinga.io"
-              SSH_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF1ugc8F2HoW2SGAn35Eoo3bt8KjGgfTn8fIczXM40o2 ravi@gobazzinga.io"
-              ;;
-            *)
-              echo "::error::Unknown user: ${{ inputs.user }}"
-              exit 1
-              ;;
-          esac
+          echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > ansible/.vault_pass
+          chmod 600 ansible/.vault_pass
 
-          echo "user_email=$USER_EMAIL" >> $GITHUB_OUTPUT
-          # Export SSH key as multi-line output
-          {
-            echo 'ssh_key<<EOF'
-            echo "$SSH_KEY"
-            echo EOF
-          } >> $GITHUB_OUTPUT
-
-      - name: Set up Ansible vault password
-        env:
-          VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+      - name: Grant SSH access to team member
+        working-directory: ansible
         run: |
-          if [ -z "$VAULT_PASSWORD" ]; then
-            echo "::error::ANSIBLE_VAULT_PASSWORD secret is not set or is empty"
-            echo "Please add the vault password as a repository secret named ANSIBLE_VAULT_PASSWORD"
-            exit 1
-          fi
-          cd ansible
-          echo "$VAULT_PASSWORD" > .vault_pass
-          chmod 600 .vault_pass
-          echo "✓ Vault password file created"
-
-      - name: Validate target host exists in inventory
-        run: |
-          cd ansible
-
-          TARGET="${{ inputs.target_host }}"
-
-          # Skip validation for 'all'
-          if [ "$TARGET" == "all" ]; then
-            echo "✓ Target is 'all' - skipping host validation"
-            exit 0
-          fi
-
-          # Check if host exists in inventory
-          if ansible-inventory --list | grep -q "\"$TARGET\""; then
-            echo "✓ Host '$TARGET' found in inventory"
-          else
-            echo "::error::Host '$TARGET' not found in inventory"
-            echo "Available hosts:"
-            ansible-inventory --list | jq -r '.all.children.bare_metal.hosts | keys[]' 2>/dev/null || ansible all --list-hosts
-            exit 1
-          fi
-
-      - name: Add user SSH key to authorized_keys
-        run: |
-          echo "" >> ansible/files/authorized_keys
-          echo "${{ steps.map_key.outputs.ssh_key }}" >> ansible/files/authorized_keys
-          echo "✓ Added SSH key for ${{ steps.map_key.outputs.user_email }}"
-          echo ""
-          echo "Updated authorized_keys:"
-          cat ansible/files/authorized_keys
-
-      - name: Set up SSH key
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.HETZNER_BARE_METAL_GITHUB_ACTIONS_SSH_PRIVATE_KEY }}
-        run: |
-          mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          # Add SSH agent configuration
-          eval "$(ssh-agent -s)"
-          ssh-add ~/.ssh/id_ed25519
-
-      - name: Test Ansible connectivity
-        run: |
-          cd ansible
-          ansible ${{ inputs.target_host }} -m ping -v
-
-      - name: Deploy SSH keys to target host(s)
-        run: |
-          cd ansible
-          ansible-playbook \
+          ansible-playbook -i inventory/hosts.yml playbooks/hetzner-ssh-key-grant.yml \
             --limit "${{ inputs.target_host }}" \
-            -v \
-            playbooks/ssh-security.yml
+            --extra-vars "team_member_name=${{ inputs.team_member }}"
 
-      - name: Verify SSH keys on server
-        run: |
-          cd ansible
-          echo "## 🔍 Verifying SSH keys deployed to server(s)" 
-          echo ""
-          ansible ${{ inputs.target_host }} -m shell -a "cat /root/.ssh/authorized_keys" -v
-
-      - name: Generate access grant summary
+      - name: Cleanup vault password
         if: always()
-        run: |
-          echo "## 🔑 Temporary SSH Access Granted" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **User** | ${{ steps.map_key.outputs.user_email }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Target Host(s)** | \`${{ inputs.target_host }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Granted At** | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Workflow Run** | [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### ⏰ Auto-Revocation Notice" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "> **This access will be automatically revoked** on the next scheduled fleet management run." >> $GITHUB_STEP_SUMMARY
-          echo "> The [Run Ansible Playbooks](${{ github.server_url }}/${{ github.repository }}/actions/workflows/run-ansible-playbooks.yml) workflow runs every **Sunday at 2 AM UTC** and restores SSH keys to baseline (GitHub Actions + Saikat only)." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📋 Authorized Keys in Workflow (before deployment)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cat ansible/files/authorized_keys >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ssh-access-grant-logs-${{ github.run_id }}
-          path: |
-            ansible/ansible.log
-          retention-days: 30
-
-      - name: Notify on failure
-        if: failure()
-        run: |
-          echo "::error::Failed to grant SSH access to ${{ steps.map_key.outputs.user_email }} on ${{ inputs.target_host }}"
-          echo "Check the logs and artifacts for more details."
-
-      - name: Success notification
-        if: success()
-        run: |
-          echo "::notice::✓ Successfully granted SSH access to ${{ steps.map_key.outputs.user_email }} on ${{ inputs.target_host }}"
+        run: rm -f ansible/.vault_pass

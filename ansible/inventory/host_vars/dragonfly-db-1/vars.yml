@@ -1,0 +1,6 @@
+---
+# Variables for dragonfly-db-1
+# References encrypted values from vault.yml
+
+# Beszel monitoring agent token
+beszel_agent_token: "{{ vault_dragonfly_db_1_beszel_agent_token }}"

@@ -1,0 +1,6 @@
+---
+# Variables for sentry-1
+# References encrypted values from vault.yml
+
+# Beszel monitoring agent token
+beszel_agent_token: "{{ vault_sentry_1_beszel_agent_token }}"

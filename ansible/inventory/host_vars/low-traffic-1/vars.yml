@@ -1,0 +1,6 @@
+---
+# Variables for low-traffic-1
+# References encrypted values from vault.yml
+
+# Beszel monitoring agent token
+beszel_agent_token: "{{ vault_low_traffic_1_beszel_agent_token }}"

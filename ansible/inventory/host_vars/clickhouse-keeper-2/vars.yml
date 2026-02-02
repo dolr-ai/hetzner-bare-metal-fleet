@@ -1,0 +1,6 @@
+---
+# Variables for clickhouse-keeper-2
+# References encrypted values from vault.yml
+
+# Beszel monitoring agent token
+beszel_agent_token: "{{ vault_clickhouse_keeper_2_beszel_agent_token }}"

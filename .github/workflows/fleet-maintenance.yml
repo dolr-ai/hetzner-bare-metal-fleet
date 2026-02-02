@@ -1,66 +1,48 @@
 name: Fleet Maintenance
 
 on:
-  # Manual trigger
   workflow_dispatch:
     inputs:
       target_hosts:
-        description: "Target hosts (all, or specific host)"
-        required: true
+        description: "Target hosts (specific hostname, group, or 'all')"
+        required: false
         default: "all"
         type: string
+      run_system_update:
+        description: "Run system updates"
+        required: false
+        default: true
+        type: boolean
       run_ssh_security:
-        description: "Run SSH security audit and configuration"
+        description: "Configure SSH security"
         required: false
         default: true
         type: boolean
       run_docker_setup:
-        description: "Run Docker installation if missing"
+        description: "Install/update Docker"
         required: false
-        default: true
-        type: boolean
-      run_system_update:
-        description: "Run system updates and upgrades"
-        required: false
-        default: true
+        default: false
         type: boolean
       run_beszel_agent:
-        description: "Run Beszel agent setup"
-        required: false
-        default: true
-        type: boolean
-
-      enable_reboot:
-        description: "Enable automatic reboot if required"
+        description: "Deploy/update Beszel monitoring agent"
         required: false
         default: false
         type: boolean
-
-  # Scheduled run (every Sunday at 2 AM UTC)
+      enable_reboot:
+        description: "Allow automatic reboot if needed"
+        required: false
+        default: false
+        type: boolean
   schedule:
-    - cron: "0 2 * * 0"
-
-  # Allow triggering from other workflows
-  workflow_call:
-    inputs:
-      target_hosts:
-        description: "Target hosts"
-        required: false
-        default: "all"
-        type: string
-      enable_reboot:
-        description: "Enable automatic reboot"
-        required: false
-        default: false
-        type: boolean
+    - cron: "0 2 * * 0"  # Sundays at 2 AM UTC
 
 env:
   ANSIBLE_HOST_KEY_CHECKING: False
   ANSIBLE_FORCE_COLOR: True
 
 jobs:
-  fleet-management:
-    name: Fleet Management
+  maintenance:
+    name: Run Fleet Maintenance
     runs-on: ubuntu-latest
     timeout-minutes: 90
 
@@ -73,111 +55,46 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install Ansible and dependencies
+      - name: Install Ansible
         run: |
           pip install --upgrade pip
           pip install ansible ansible-core
           ansible-galaxy collection install ansible.posix community.general
 
-      - name: Set up SSH key
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.HETZNER_BARE_METAL_GITHUB_ACTIONS_SSH_PRIVATE_KEY }}
+      - name: Configure vault password
         run: |
-          mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          # Add SSH agent configuration
-          eval "$(ssh-agent -s)"
-          ssh-add ~/.ssh/id_ed25519
+          echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > ansible/.vault_pass
+          chmod 600 ansible/.vault_pass
 
-      - name: Set up Ansible vault password
-        env:
-          VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+      - name: Run system updates
+        if: ${{ inputs.run_system_update || github.event_name == 'schedule' }}
+        working-directory: ansible
         run: |
-          if [ -z "$VAULT_PASSWORD" ]; then
-            echo "::error::ANSIBLE_VAULT_PASSWORD secret is not set or is empty"
-            echo "Please add the vault password as a repository secret named ANSIBLE_VAULT_PASSWORD"
-            exit 1
-          fi
-          cd ansible
-          echo "$VAULT_PASSWORD" > .vault_pass
-          chmod 600 .vault_pass
-          echo "✓ Vault password file created"
+          ansible-playbook -i inventory/hosts.yml playbooks/system-update.yml \
+            --limit "${{ inputs.target_hosts || 'all' }}" \
+            --extra-vars "enable_reboot=${{ inputs.enable_reboot || false }}"
 
-      - name: Test Ansible connectivity
+      - name: Configure SSH security
+        if: ${{ inputs.run_ssh_security || github.event_name == 'schedule' }}
+        working-directory: ansible
         run: |
-          cd ansible
-          ansible ${{ inputs.target_hosts || 'all' }} -m ping -v
+          ansible-playbook -i inventory/hosts.yml playbooks/ssh-security.yml \
+            --limit "${{ inputs.target_hosts || 'all' }}"
 
-      - name: Run system update playbook
-        if: ${{ inputs.run_system_update == true || github.event_name == 'push' || github.event_name == 'schedule' }}
+      - name: Install/update Docker
+        if: ${{ inputs.run_docker_setup }}
+        working-directory: ansible
         run: |
-          cd ansible
-          ansible-playbook \
-            --limit ${{ inputs.target_hosts || 'all' }} \
-            -v \
-            playbooks/system-update.yml \
-            ${{ (inputs.enable_reboot == true || github.event_name == 'push' || github.event_name == 'schedule') && '-e enable_reboot=true' || '' }}
+          ansible-playbook -i inventory/hosts.yml playbooks/docker-setup.yml \
+            --limit "${{ inputs.target_hosts || 'all' }}"
 
-      - name: Run SSH security playbook
-        if: ${{ inputs.run_ssh_security == true || github.event_name == 'push' || github.event_name == 'schedule' }}
+      - name: Deploy/update Beszel agent
+        if: ${{ inputs.run_beszel_agent }}
+        working-directory: ansible
         run: |
-          cd ansible
-          ansible-playbook \
-            --limit ${{ inputs.target_hosts || 'all' }} \
-            -v \
-            playbooks/ssh-security.yml
+          ansible-playbook -i inventory/hosts.yml playbooks/beszel-agent-setup.yml \
+            --limit "${{ inputs.target_hosts || 'all' }}"
 
-      - name: Run Docker setup playbook
-        if: ${{ inputs.run_docker_setup == true || github.event_name == 'push' || github.event_name == 'schedule' }}
-        run: |
-          cd ansible
-          ansible-playbook \
-            --limit ${{ inputs.target_hosts || 'all' }} \
-            -v \
-            playbooks/docker-setup.yml
-
-      - name: Run Beszel agent setup playbook
-        if: ${{ inputs.run_beszel_agent == true || github.event_name == 'push' || github.event_name == 'schedule' }}
-        run: |
-          cd ansible
-          ansible-playbook \
-            --limit ${{ inputs.target_hosts || 'all' }} \
-            -v \
-            playbooks/beszel-agent-setup.yml
-
-      - name: Generate update summary
+      - name: Cleanup vault password
         if: always()
-        run: |
-          cd ansible
-          echo "## Fleet Management Summary" >> $GITHUB_STEP_SUMMARY
-          echo "**Target:** ${{ inputs.target_hosts || 'all' }}" >> $GITHUB_STEP_SUMMARY
-          echo "**SSH Security:** ${{ inputs.run_ssh_security || 'true (auto)' }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Docker Setup:** ${{ inputs.run_docker_setup || 'true (auto)' }}" >> $GITHUB_STEP_SUMMARY
-          echo "**System Update:** ${{ inputs.run_system_update || 'true (auto)' }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Beszel Agent:** ${{ inputs.run_beszel_agent || 'true (auto)' }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Enable Reboot:** ${{ inputs.enable_reboot || 'false' }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
-
-          if [ -f ansible.log ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### Ansible Log Summary" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            tail -20 ansible.log >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          fi
-
-      - name: Upload Ansible logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: maintenance-${{ github.run_id }}
-          path: |
-            ansible/ansible.log
-          retention-days: 30
-
-      - name: Notify on failure
-        if: failure()
-        run: |
-          echo "::error::Fleet management failed for target: ${{ inputs.target_hosts || 'all' }}"
-          echo "Check the logs and artifacts for more details."
+        run: rm -f ansible/.vault_pass

@@ -1,0 +1,124 @@
+---
+- name: Activate Hetzner Rescue Mode
+  hosts: all
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    rescue_os: "linux"
+    rescue_arch: "64"
+    hetzner_api_url: "https://robot-ws.your-server.de"
+    
+  tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - hetzner_robot_user is defined
+          - hetzner_robot_password is defined
+          - ansible_host is defined
+        fail_msg: "Required variables not defined. Ensure Hetzner credentials and ansible_host are set."
+        
+    - name: Fetch all SSH keys from Hetzner API
+      uri:
+        url: "{{ hetzner_api_url }}/key"
+        method: GET
+        user: "{{ hetzner_robot_user }}"
+        password: "{{ hetzner_robot_password }}"
+        force_basic_auth: yes
+        status_code: 200
+      register: hetzner_keys_response
+      delegate_to: localhost
+      
+    - name: Build SSH key fingerprint mapping
+      set_fact:
+        hetzner_key_map: >-
+          {{
+            hetzner_keys_response.json
+            | map(attribute='key')
+            | selectattr('name', 'defined')
+            | selectattr('fingerprint', 'defined')
+            | map('dict2items')
+            | flatten
+            | selectattr('key', 'in', ['name', 'fingerprint'])
+            | groupby('value')
+            | dict2items
+            | json_query('[].{name: key, items: value}')
+            | items2dict(key_name='name', value_name='items')
+          }}
+      delegate_to: localhost
+      
+    - name: Extract key fingerprints for rescue mode
+      set_fact:
+        rescue_key_fingerprints: >-
+          {{
+            canonical_ssh_keys
+            | map(attribute='name')
+            | map('lower')
+            | map('regex_replace', '^(.*)@.*$', '\1')
+            | list
+          }}
+      delegate_to: localhost
+      
+    - name: Display keys to be added to rescue mode
+      debug:
+        msg: "Adding {{ rescue_key_fingerprints | length }} SSH key(s) to rescue mode"
+        
+    - name: Activate rescue mode via Hetzner Robot API
+      uri:
+        url: "{{ hetzner_api_url }}/boot/{{ ansible_host }}/rescue"
+        method: POST
+        user: "{{ hetzner_robot_user }}"
+        password: "{{ hetzner_robot_password }}"
+        force_basic_auth: yes
+        body_format: form-urlencoded
+        body:
+          os: "{{ rescue_os }}"
+          arch: "{{ rescue_arch }}"
+          authorized_key: "{{ rescue_key_fingerprints }}"
+        status_code: 200
+      register: rescue_activation
+      delegate_to: localhost
+      
+    - name: Display rescue mode activation result
+      debug:
+        msg: "Rescue mode activated. Root password: {{ rescue_activation.json.rescue.password | default('N/A') }}"
+        
+    - name: Reboot server into rescue mode via Hetzner Robot API
+      uri:
+        url: "{{ hetzner_api_url }}/reset/{{ ansible_host }}"
+        method: POST
+        user: "{{ hetzner_robot_user }}"
+        password: "{{ hetzner_robot_password }}"
+        force_basic_auth: yes
+        body_format: form-urlencoded
+        body:
+          type: "hw"
+        status_code: 200
+      register: reboot_result
+      delegate_to: localhost
+      
+    - name: Wait for server to go down
+      wait_for:
+        host: "{{ ansible_host }}"
+        port: 22
+        state: stopped
+        timeout: 60
+      delegate_to: localhost
+      failed_when: false
+      
+    - name: Wait for server to come back up in rescue mode
+      wait_for:
+        host: "{{ ansible_host }}"
+        port: 22
+        state: started
+        delay: 30
+        timeout: 300
+      delegate_to: localhost
+      
+    - name: Verify rescue mode is active
+      shell: |
+        if [ ! -f /root/.oldroot/nfs/install/installimage ]; then
+          echo "ERROR: Not in rescue mode!"
+          exit 1
+        fi
+        echo "Rescue mode confirmed"
+      changed_when: false

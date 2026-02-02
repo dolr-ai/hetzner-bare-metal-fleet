@@ -1,0 +1,42 @@
+---
+# Ansible Variables - References to Vault Secrets
+# This file is unencrypted and references encrypted values from vault.yml
+#
+# All sensitive values are stored in vault.yml and referenced here
+
+# Hetzner Robot API credentials
+hetzner_robot_user: "{{ vault_hetzner_robot_user }}"
+hetzner_robot_password: "{{ vault_hetzner_robot_password }}"
+
+# GitHub Actions SSH key
+github_actions_ssh_private_key: "{{ vault_github_actions_ssh_private_key }}"
+
+# Beszel monitoring configuration
+beszel_hub_url: "https://beszel.yral.com"
+beszel_listen_port: 45876
+beszel_ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFbMj/W6oT9440QejCiVlJbnuBlWK/mCxJnzEHO1dOYq"
+
+# Team member SSH keys for temporary access
+team_members:
+  jay:
+    email: "jay@gobazzinga.io"
+    ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC4EEE0Ujs02S8QJojavczuX8DqesE3OdaATdN7/b592 jay@gobazzinga.io"
+  joel:
+    email: "joel@gobazzinga.io"
+    ssh_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCfknevgb+805mjUliPsHJxbKdCePkUSkhSefgiC6uZjOltQCYo4G8H0il5l53+HNPYptqKTtKResEUBwsK7zOdfItnU9Gyp8Zqzs/GfY4ICyYGfXrgIDk/J41wkSG/0LBmnICu7gM9STETbjKZF7yLwtKlhnJyLHzAtCuH2QKNI2gV4psfsIruT4ZbYPEX0Yn1L63AoxYuOJ+ligqWvkxy91/NJE1qt2Mt9HtWnTp0nsFHfbiomGaqwEKNy+tFWiVJucLHgJ9KoYOUApI2MYn/vZVtbuU4uWz0yQfuFJwNVwDyPu14RrcbZqM8Uwg+x3YnY+sgv4671ajb1mgxh41L2SXYa1pg0wqbq1ah0BtP4aJD3rckaCSmtlfQUs2SY2+eCyLK29WtwALld+XCkFt5VtD94K2ujoOJ1SoAjCCSOYv5XLAbMcZnoa5nX9DO2UQMACRo6XbRO/DnqTCHleC6Kh735ZJNOihN3NOVYIT3nxvHPAOL6Huv+vSlDXUSAd5nMDbHj8WAC1/08LWLqcrLSiDGi4No6DAcl40cH6nF902u0khx8z9IPWBi/p5Ra2xznJG65emXJnThc3Pj29C2FQsWIlaaCOWtGoxSinic+Azp1EJBUIk0sxEsX2xW3wJboYC2MnLBYlVAy07+c6EMCrwEjexBkwJSYEIaqFOt+w== joel@gobazzinga.io"
+  kevin:
+    email: "kevin@gobazzinga.io"
+    ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDeh+bxWavxerRDziQ2vFFw7isP3lC408Y1z4CbK1Thz kevin@gobazzinga.io"
+  naitik:
+    email: "naitik@gobazzinga.io"
+    ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEiXkPkZghjS+QfvScVTFRsUZCh7ibH80bb/ls4ddJHs naitik@gobazzinga.io"
+  ravi:
+    email: "ravi@gobazzinga.io"
+    ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF1ugc8F2HoW2SGAn35Eoo3bt8KjGgfTn8fIczXM40o2 ravi@gobazzinga.io"
+
+# Canonical SSH keys (always included)
+canonical_ssh_keys:
+  - name: "github-actions@yral.com"
+    key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJiePbl4hA23f3RUCUW/g0iWfnvDqGh1gvMPV5GK8WH5 github-actions@yral.com"
+  - name: "saikatdas0790@gmail.com"
+    key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMTd7U+HxxqwNvvp81WvGMpU6ypsBGPKZLHMcq4SgGBR saikatdas0790@gmail.com"

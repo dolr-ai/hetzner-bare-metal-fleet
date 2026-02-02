@@ -1,0 +1,6 @@
+---
+# Variables for team-dev-server-1
+# References encrypted values from vault.yml
+
+# Beszel monitoring agent token
+beszel_agent_token: "{{ vault_team_dev_server_1_beszel_agent_token }}"
