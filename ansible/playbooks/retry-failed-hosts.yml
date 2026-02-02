@@ -1,0 +1,28 @@
+---
+# Ansible will automatically create a retry file when a playbook fails
+# This playbook can be used to retry failed hosts from a previous run
+
+- name: Retry Failed Hosts from Previous Run
+  hosts: all
+  gather_facts: false
+  vars:
+    retry_count: 3
+    retry_delay: 30
+  
+  tasks:
+    - name: Display retry information
+      debug:
+        msg: "Attempting to retry connection for {{ inventory_hostname }} ({{ ansible_host }})"
+      run_once: false
+
+    - name: Wait for host to be reachable
+      wait_for_connection:
+        timeout: 60
+        delay: "{{ retry_delay }}"
+      retries: "{{ retry_count }}"
+      register: connection_result
+      until: connection_result is succeeded
+
+    - name: Gather facts after successful connection
+      setup:
+      when: connection_result is succeeded

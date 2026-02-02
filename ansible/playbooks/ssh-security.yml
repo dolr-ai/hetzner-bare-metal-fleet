@@ -3,13 +3,20 @@
   hosts: all
   gather_facts: true
   become: true
+  max_fail_percentage: 50
   vars:
     ansible_python_interpreter: /usr/bin/python3
+    retry_count: 3
+    retry_delay: 10
 
   tasks:
     - name: Wait for system to be ready
       wait_for_connection:
         timeout: 60
+        delay: "{{ retry_delay }}"
+      retries: "{{ retry_count }}"
+      register: connection_result
+      until: connection_result is succeeded
 
     - name: Check if system is Debian/Ubuntu
       fail:

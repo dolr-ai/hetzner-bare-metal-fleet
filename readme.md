@@ -89,6 +89,29 @@ Actions → Grant Temporary SSH Access → Select team member + host
 | `docker-setup.yml` | Install Docker CE |
 | `beszel-agent-setup.yml` | Deploy monitoring agent |
 | `system-update.yml` | System updates with optional reboot |
+| `retry-failed-hosts.yml` | Retry connections to previously failed hosts |
+
+## Retry Failed Hosts
+
+All playbooks now include automatic retry logic for connection failures. When hosts fail to connect:
+
+1. **Automatic retries** - 3 connection attempts with 10-second delays
+2. **Retry files** - Automatically saved to `ansible/retry/`
+3. **Partial failures** - Up to 50% of hosts can fail without stopping the workflow
+
+### Quick Retry Examples
+
+```bash
+# Retry a specific failed host
+ansible-playbook ansible/playbooks/system-update.yml --limit offchain-agent-1
+
+# Use auto-generated retry file
+ansible-playbook ansible/playbooks/system-update.yml --limit @ansible/retry/system-update.retry
+
+# Or via GitHub Actions - set target_hosts to the failed hostname
+```
+
+**📖 Full retry guide:** See [RETRY_GUIDE.md](RETRY_GUIDE.md) for detailed instructions and troubleshooting.
 
 ## Vault Management
 

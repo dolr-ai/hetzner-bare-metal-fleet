@@ -5,6 +5,10 @@ ansible/.vault_pass
 # Ansible logs
 ansible/ansible.log
 
+# Ansible retry files
+ansible/retry/*.retry
+*.retry
+
 # Python
 __pycache__/
 *.py[cod]
