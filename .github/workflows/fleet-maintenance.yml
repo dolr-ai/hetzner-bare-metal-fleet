@@ -74,10 +74,17 @@ jobs:
             echo "$ANSIBLE_VAULT_PASSWORD" > ansible/.vault_pass
             chmod 600 ansible/.vault_pass
             
-            # Extract SSH key from vault
+            # Extract SSH key from vault (github-actions@yral.com)
             mkdir -p ~/.ssh
-            ansible-vault view ansible/group_vars/all/vault.yml | awk '/vault_github_actions_ssh_private_key:/,/-----END OPENSSH PRIVATE KEY-----/' | tail -n +2 | sed 's/^  //' > ~/.ssh/id_ed25519
-            chmod 600 ~/.ssh/id_ed25519
+            ansible-vault view ansible/group_vars/all/vault.yml | awk '/vault_github_actions_ssh_private_key:/,/-----END OPENSSH PRIVATE KEY-----/' | tail -n +2 | sed 's/^  //' > ~/.ssh/ansible_hetzner_fleet
+            chmod 600 ~/.ssh/ansible_hetzner_fleet
+            
+            # Cleanup function to remove temporary credentials
+            cleanup() {
+              rm -f ~/.ssh/ansible_hetzner_fleet
+              rm -f ansible/.vault_pass
+            }
+            trap cleanup EXIT
             
             # Determine target hosts
             TARGET="${{ inputs.target_hosts }}"

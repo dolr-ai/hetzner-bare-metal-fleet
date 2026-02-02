@@ -1,6 +1,6 @@
 ---
 # Common connection settings for all bare metal hosts
 ansible_user: root
-ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+ansible_ssh_private_key_file: ~/.ssh/ansible_hetzner_fleet
 ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 ansible_python_interpreter: /usr/bin/python3

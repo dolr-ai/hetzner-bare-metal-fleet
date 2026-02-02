@@ -54,10 +54,10 @@ else
     exit 1
 fi
 
-# Extract SSH key from vault
+# Extract SSH key from vault (github-actions key)
 echo ""
-echo "Setting up SSH key for server access..."
-SSH_KEY_PATH="$HOME/.ssh/id_ed25519"
+echo "Setting up SSH key for Hetzner fleet access..."
+SSH_KEY_PATH="$HOME/.ssh/ansible_hetzner_fleet"
 
 if [ -f "$SSH_KEY_PATH" ]; then
     echo "⚠️  SSH key already exists at $SSH_KEY_PATH"
@@ -69,7 +69,7 @@ if [ -f "$SSH_KEY_PATH" ]; then
         mkdir -p ~/.ssh
         ansible-vault view ansible/group_vars/all/vault.yml | awk '/vault_github_actions_ssh_private_key:/,/-----END OPENSSH PRIVATE KEY-----/' | tail -n +2 | sed 's/^  //' > "$SSH_KEY_PATH"
         chmod 600 "$SSH_KEY_PATH"
-        echo "✓ SSH key extracted from vault and saved to $SSH_KEY_PATH"
+        echo "✓ SSH key (github-actions@yral.com) extracted from vault and saved to $SSH_KEY_PATH"
     fi
 else
     mkdir -p ~/.ssh
