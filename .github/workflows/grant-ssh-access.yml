@@ -32,29 +32,40 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
         with:
-          python-version: "3.11"
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install Ansible
-        run: |
-          pip install --upgrade pip
-          pip install ansible ansible-core
-          ansible-galaxy collection install ansible.posix community.general
-
-      - name: Configure vault password
-        run: |
-          echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > ansible/.vault_pass
-          chmod 600 ansible/.vault_pass
-
-      - name: Grant SSH access to team member
-        working-directory: ansible
-        run: |
-          ansible-playbook -i inventory/hosts.yml playbooks/hetzner-ssh-key-grant.yml \
-            --limit "${{ inputs.target_host }}" \
-            --extra-vars "team_member_name=${{ inputs.team_member }}"
-
-      - name: Cleanup vault password
-        if: always()
-        run: rm -f ansible/.vault_pass
+      - name: Grant SSH access
+        uses: devcontainers/ci@v0.3
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+          SSH_PRIVATE_KEY: ${{ secrets.GITHUB_ACTIONS_SSH_KEY }}
+          ANSIBLE_HOST_KEY_CHECKING: False
+          ANSIBLE_FORCE_COLOR: True
+        with:
+          imageName: ghcr.io/dolr-ai/hetzner-fleet-devcontainer
+          cacheFrom: ghcr.io/dolr-ai/hetzner-fleet-devcontainer
+          push: filter
+          runCmd: |
+            set -e
+            
+            # Set up SSH key
+            mkdir -p ~/.ssh
+            echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+            chmod 600 ~/.ssh/id_ed25519
+            
+            # Set up vault password
+            echo "$ANSIBLE_VAULT_PASSWORD" > ansible/.vault_pass
+            chmod 600 ansible/.vault_pass
+            
+            # Change to ansible directory
+            cd ansible
+            
+            # Grant SSH access
+            ansible-playbook -i inventory/hosts.yml playbooks/hetzner-ssh-key-grant.yml \
+              --limit "${{ inputs.target_host }}" \
+              --extra-vars "team_member_name=${{ inputs.team_member }}"
