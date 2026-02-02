@@ -41,10 +41,6 @@ jobs:
 
       - name: Provision and configure server
         uses: devcontainers/ci@v0.3
-        env:
-          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
-          ANSIBLE_HOST_KEY_CHECKING: False
-          ANSIBLE_FORCE_COLOR: True
         with:
           imageName: ghcr.io/dolr-ai/hetzner-fleet-devcontainer
           cacheFrom: ghcr.io/dolr-ai/hetzner-fleet-devcontainer
@@ -53,8 +49,15 @@ jobs:
             set -e
             
             # Set up vault password
-            echo "$ANSIBLE_VAULT_PASSWORD" > ansible/.vault_pass
+            echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > ansible/.vault_pass
             chmod 600 ansible/.vault_pass
+            
+            # Validate vault password file
+            [ -s ansible/.vault_pass ] || { echo "ERROR: Vault password file is empty - GitHub secret may not be set"; exit 1; }
+            echo "✓ Vault password file created ($(wc -c < ansible/.vault_pass) bytes)"
+            
+            # Test vault password with quick decryption
+            ansible-vault view --vault-password-file=ansible/.vault_pass ansible/group_vars/all/vault.yml >/dev/null 2>&1 && echo "✓ Vault password validated successfully" || { echo "ERROR: Vault password test failed - incorrect password"; exit 1; }
             
             # Extract SSH key from vault (github-actions@yral.com)
             mkdir -p ~/.ssh
