@@ -78,11 +78,11 @@ jobs:
             echo "✓ Vault password file created ($(wc -c < ansible/.vault_pass) bytes)"
             
             # Test vault password with quick decryption
-            ansible-vault view --vault-password-file=ansible/.vault_pass ansible/group_vars/all/vault.yml >/dev/null 2>&1 && echo "✓ Vault password validated successfully" || { echo "ERROR: Vault password test failed - incorrect password"; exit 1; }
+            ansible-vault view --vault-password-file=ansible/.vault_pass ansible/inventory/group_vars/all/vault.yml >/dev/null 2>&1 && echo "✓ Vault password validated successfully" || { echo "ERROR: Vault password test failed - incorrect password"; exit 1; }
             
             # Extract SSH key from vault (github-actions@yral.com)
             mkdir -p ~/.ssh
-            ansible-vault view ansible/group_vars/all/vault.yml | awk '/vault_github_actions_ssh_private_key:/,/-----END OPENSSH PRIVATE KEY-----/' | tail -n +2 | sed 's/^  //' > ~/.ssh/ansible_hetzner_fleet
+            ansible-vault view ansible/inventory/group_vars/all/vault.yml | awk '/vault_github_actions_ssh_private_key:/,/-----END OPENSSH PRIVATE KEY-----/' | tail -n +2 | sed 's/^  //' > ~/.ssh/ansible_hetzner_fleet
             chmod 600 ~/.ssh/ansible_hetzner_fleet
             
             # Cleanup function to remove temporary credentials
