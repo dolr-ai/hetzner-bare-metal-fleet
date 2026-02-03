@@ -76,5 +76,6 @@ jobs:
             
             # Grant SSH access
             ansible-playbook ansible/playbooks/hetzner-ssh-key-grant.yml \
+              --vault-password-file=ansible/.vault_pass \
               --limit "${{ inputs.target_host }}" \
               --extra-vars "team_member_name=${{ inputs.team_member }}"
