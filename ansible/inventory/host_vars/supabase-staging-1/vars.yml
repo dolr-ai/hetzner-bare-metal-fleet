@@ -1,5 +1,4 @@
 ---
-# Variables for airflow-1
 # References encrypted values from vault.yml
 
 # Beszel monitoring agent token

@@ -28,40 +28,16 @@
       register: hetzner_keys_response
       delegate_to: localhost
       
-    - name: Build SSH key fingerprint mapping
+    - name: Extract SSH key fingerprints from Hetzner response
       set_fact:
-        hetzner_key_map: >-
-          {{
-            hetzner_keys_response.json
-            | map(attribute='key')
-            | selectattr('name', 'defined')
-            | selectattr('fingerprint', 'defined')
-            | map('dict2items')
-            | flatten
-            | selectattr('key', 'in', ['name', 'fingerprint'])
-            | groupby('value')
-            | dict2items
-            | json_query('[].{name: key, items: value}')
-            | items2dict(key_name='name', value_name='items')
-          }}
+        hetzner_key_fingerprints: "{{ hetzner_keys_response.json | map(attribute='key.fingerprint') | list }}"
       delegate_to: localhost
       
-    - name: Extract key fingerprints for rescue mode
-      set_fact:
-        rescue_key_fingerprints: >-
-          {{
-            canonical_ssh_keys
-            | map(attribute='name')
-            | map('lower')
-            | map('regex_replace', '^(.*)@.*$', '\1')
-            | list
-          }}
-      delegate_to: localhost
-      
-    - name: Display keys to be added to rescue mode
+    - name: Display available SSH keys
       debug:
-        msg: "Adding {{ rescue_key_fingerprints | length }} SSH key(s) to rescue mode"
-        
+        msg: "Found {{ hetzner_key_fingerprints | length }} SSH key(s) in Hetzner account"
+      delegate_to: localhost
+      
     - name: Activate rescue mode via Hetzner Robot API
       uri:
         url: "{{ hetzner_api_url }}/boot/{{ ansible_host }}/rescue"
@@ -73,7 +49,7 @@
         body:
           os: "{{ rescue_os }}"
           arch: "{{ rescue_arch }}"
-          authorized_key: "{{ rescue_key_fingerprints }}"
+          authorized_key: "{{ hetzner_key_fingerprints }}"
         status_code: 200
       register: rescue_activation
       delegate_to: localhost
