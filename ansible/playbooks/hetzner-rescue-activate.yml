@@ -28,14 +28,32 @@
       register: hetzner_keys_response
       delegate_to: localhost
       
-    - name: Extract SSH key fingerprints from Hetzner response
+    - name: Build list of canonical key names to match
       set_fact:
-        hetzner_key_fingerprints: "{{ hetzner_keys_response.json | map(attribute='key.fingerprint') | list }}"
+        canonical_key_names: "{{ canonical_ssh_keys | map(attribute='name') | list }}"
       delegate_to: localhost
       
-    - name: Display available SSH keys
+    - name: Filter and extract fingerprints for canonical keys only
+      set_fact:
+        hetzner_key_fingerprints: >-
+          {{
+            hetzner_keys_response.json
+            | selectattr('key.name', 'defined')
+            | selectattr('key.name', 'in', canonical_key_names)
+            | map(attribute='key.fingerprint')
+            | list
+          }}
+      delegate_to: localhost
+      
+    - name: Display SSH keys to be added to rescue mode
       debug:
-        msg: "Found {{ hetzner_key_fingerprints | length }} SSH key(s) in Hetzner account"
+        msg: "Adding {{ hetzner_key_fingerprints | length }} canonical SSH key(s) to rescue mode: {{ canonical_key_names | join(', ') }}"
+      delegate_to: localhost
+      
+    - name: Build form data with multiple authorized_key fields
+      set_fact:
+        rescue_form_body: >-
+          os={{ rescue_os }}&arch={{ rescue_arch }}{% for fp in hetzner_key_fingerprints %}&authorized_key[]={{ fp }}{% endfor %}
       delegate_to: localhost
       
     - name: Activate rescue mode via Hetzner Robot API
@@ -45,11 +63,9 @@
         user: "{{ hetzner_robot_user }}"
         password: "{{ hetzner_robot_password }}"
         force_basic_auth: yes
-        body_format: form-urlencoded
-        body:
-          os: "{{ rescue_os }}"
-          arch: "{{ rescue_arch }}"
-          authorized_key: "{{ hetzner_key_fingerprints }}"
+        body: "{{ rescue_form_body }}"
+        headers:
+          Content-Type: "application/x-www-form-urlencoded"
         status_code: 200
       register: rescue_activation
       delegate_to: localhost
