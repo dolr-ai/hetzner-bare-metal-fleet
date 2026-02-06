@@ -42,7 +42,7 @@ team_members:
   sarvesh:
     email: "sarvesh@gobazzinga.io"
     ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICbzdGvEwbNzK61s7dEEpTq6AO6qHZUCi6+jgnsIsZuh sarvesh@gobazzinga.io"
-  shivambhavsar:
+  shivam:
     email: "shivambhavsar@gobazzinga.io"
     ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBnpCcMpKKwA8oblsTUhy4f7agQwQm3zosOt1SIAdV/+ shivambhavsar@gobazzinga.io"
 
