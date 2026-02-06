@@ -27,12 +27,24 @@ team_members:
   kevin:
     email: "kevin@gobazzinga.io"
     ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDeh+bxWavxerRDziQ2vFFw7isP3lC408Y1z4CbK1Thz kevin@gobazzinga.io"
+  mayank:
+    email: "mayank@gobazzinga.io"
+    ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKVK38WXCib7L5ZGGP3xmP/UrrWjszuHJrOAabdGwjcQ mayank@gobazzinga.io"
   naitik:
     email: "naitik@gobazzinga.io"
     ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEiXkPkZghjS+QfvScVTFRsUZCh7ibH80bb/ls4ddJHs naitik@gobazzinga.io"
   ravi:
     email: "ravi@gobazzinga.io"
     ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIF1ugc8F2HoW2SGAn35Eoo3bt8KjGgfTn8fIczXM40o2 ravi@gobazzinga.io"
+  samarth:
+    email: "samarth@gobazzinga.io"
+    ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILrV6M+aOVl8hTadJ7l+tfi+NXGCFC284gmbKaN46Ghi samarth@gobazzinga.io"
+  sarvesh:
+    email: "sarvesh@gobazzinga.io"
+    ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICbzdGvEwbNzK61s7dEEpTq6AO6qHZUCi6+jgnsIsZuh sarvesh@gobazzinga.io"
+  shivambhavsar:
+    email: "shivambhavsar@gobazzinga.io"
+    ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBnpCcMpKKwA8oblsTUhy4f7agQwQm3zosOt1SIAdV/+ shivambhavsar@gobazzinga.io"
 
 # Canonical SSH keys (always included)
 canonical_ssh_keys:

@@ -11,8 +11,12 @@ on:
           - jay
           - joel
           - kevin
+          - mayank
           - naitik
           - ravi
+          - samarth
+          - sarvesh
+          - shivam
       target_host:
         description: "Target host (specific hostname or 'all')"
         required: true
