@@ -1,0 +1,5 @@
+---
+# References encrypted values from vault.yml
+
+# Beszel monitoring agent token
+beszel_agent_token: "{{ vault_beszel_agent_token }}"
