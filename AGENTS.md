@@ -90,10 +90,10 @@ Three playbooks cover all intended operations — there are no other playbooks i
 ### Vault Pattern
 
 - **Group-level secrets** live in `ansible/inventory/group_vars/all/vault.yml` (encrypted).
-- **Host-level secrets** live in `ansible/inventory/host_vars/<host>/vault.yml` (encrypted).
 - All vault variables are prefixed `vault_*`.
 - Plain `vars.yml` files only contain `key: "{{ vault_key }}"` references — never raw secrets.
 - The vault password file is `ansible/.vault_pass` (600 permissions, gitignored).
+- Per-host `vault.yml` files are not used — all secrets are group-level.
 
 Example pattern:
 ```yaml
@@ -203,9 +203,9 @@ Roles that only run locally (e.g., `hetzner_rescue`) or only use raw/shell befor
 
 ## Beszel Monitoring
 
-- **Agent token**: `beszel_agent_token` — defined per-host in `host_vars/*/vars.yml`
-  (references `vault_beszel_agent_token`).  A universal token also exists in
-  `group_vars/all/vars.yml` as a fallback.
+- **Agent token**: `beszel_agent_token` — universal token from `group_vars/all/vault.yml`
+  (`vault_beszel_agent_token`). Allows agents to auto-register without prior system creation.
+  No per-host token overrides are used.
 - **Hub URL**: `beszel_hub_url` — `https://beszel.yral.com` (defined in `group_vars/all/vars.yml`).
 - **Hub host**: `uptime-monitor-1` — the only host where `beszel_hub` role runs.
 - **Hub service name**: default `beszel` (override via `beszel_hub_service_name`).
@@ -217,20 +217,13 @@ Roles that only run locally (e.g., `hetzner_rescue`) or only use raw/shell befor
 ## Adding a New Host
 
 1. Add host entry to `ansible/inventory/hosts.yml` under `bare_metal`.
-2. Create `ansible/inventory/host_vars/<hostname>/vars.yml`:
-   ```yaml
-   ---
-   beszel_agent_token: "{{ vault_beszel_agent_token }}"
-   ```
-3. Create and encrypt `ansible/inventory/host_vars/<hostname>/vault.yml`:
-   ```bash
-   ansible-vault create ansible/inventory/host_vars/<hostname>/vault.yml
-   # add: vault_beszel_agent_token: "<token>"
-   ```
-4. Run provisioning:
+2. Run provisioning:
    ```bash
    ansible-playbook ansible/playbooks/provision.yml --limit <hostname>
    ```
+
+The universal `beszel_agent_token` from `group_vars/all/vault.yml` is used automatically.
+No per-host `vars.yml` or `vault.yml` is needed unless the host requires host-specific overrides.
 
 ---
 

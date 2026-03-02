@@ -1,3 +1,1 @@
 ---
-# Beszel monitoring agent token
-beszel_agent_token: "{{ vault_beszel_agent_token }}"
