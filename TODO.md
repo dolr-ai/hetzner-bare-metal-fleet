@@ -1,2 +1,1 @@
 - clean up individual host vars since we use the universal beszel token for beszel agent provisioning
-- Looks like most of the systems require a reboot but the script is skipping reboots. Can you log into arbitrary hosts and check if reboot is required but the playbook is skipping it? If yes, let's fix why

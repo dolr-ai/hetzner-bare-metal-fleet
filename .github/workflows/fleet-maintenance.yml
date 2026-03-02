@@ -11,7 +11,7 @@ on:
       enable_reboot:
         description: "Allow automatic reboot after system update if required"
         required: false
-        default: false
+        default: true
         type: boolean
   schedule:
     - cron: "0 2 * * 0"  # Sundays at 2 AM UTC
