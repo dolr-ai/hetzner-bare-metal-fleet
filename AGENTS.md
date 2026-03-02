@@ -10,13 +10,11 @@ respected to keep the fleet automation consistent, idempotent, and safe.
 
 This repository manages a fleet of Hetzner bare-metal servers using Ansible.
 All servers run Ubuntu 24.04, are reachable as `root` via SSH key, and belong to the `bare_metal`
-inventory group.  Two sub-groups exist for lower-risk hosts:
+inventory group.  All hosts are treated equally — there are no sub-groups with special behaviour.
 
 | Group | Purpose |
 |---|---|
 | `bare_metal` | All 27 bare-metal hosts — primary target for all plays |
-| `staging` | Subset; `ssh_security` skips authorized_keys reset here |
-| `development` | Subset; `ssh_security` skips authorized_keys reset here |
 
 Monitoring hub: `uptime-monitor-1` runs the Beszel hub at `https://beszel.yral.com`.
 
@@ -128,7 +126,7 @@ Standard invocation still uses `--limit`; `target` is an alternative for program
 
 ## SSH and authorized_keys Management
 
-**Canonical set** (always present on every non-staging/non-development host):
+**Canonical set** (always present on every host):
 
 - `github-actions@yral.com` — CI/CD pipeline key
 - `saikatdas0790@gmail.com` — admin key
@@ -142,8 +140,6 @@ They are added temporarily via the `ssh_key_grant` role and **automatically expe
 > **Never add team member keys to the canonical `authorized_keys` file.**
 > Temporary access is the intentional model; canonical access requires adding keys to the file
 > in the role's `files/` directory and committing the change.
-
-**`authorized_keys` reset is skipped** for hosts in the `staging` and `development` inventory groups.
 
 ---
 

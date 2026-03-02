@@ -1,3 +1,2 @@
-- run the system-update playbook on a yral-auth-* host and make sure it works as expected
-- for the beszel agent docker compose section being added, add guidance via comments in the docker compose file on not to remove it or mess with it as it is required for the beszel agent to work properly
 - clean up individual host vars since we use the universal beszel token for beszel agent provisioning
+- Looks like most of the systems require a reboot but the script is skipping reboots. Can you log into arbitrary hosts and check if reboot is required but the playbook is skipping it? If yes, let's fix why

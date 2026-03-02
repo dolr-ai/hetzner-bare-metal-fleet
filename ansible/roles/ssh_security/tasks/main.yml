@@ -73,9 +73,7 @@
     canonical_differs: >-
       {{ (root_authorized_keys_file.stat.exists and
           (canonical_authorized_keys | default('') != (existing_authorized_keys | default(''))) and
-          (canonical_authorized_keys | default('') != '') and
-          (inventory_hostname not in groups.get('development', [])) and
-          (inventory_hostname not in groups.get('staging', []))
+          (canonical_authorized_keys | default('') != '')
          ) | bool }}
 
 - name: Print existing authorized_keys content before replacing (when different)

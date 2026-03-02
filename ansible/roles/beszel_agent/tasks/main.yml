@@ -82,6 +82,16 @@
     insertafter: "^services:"
     state: present
     block: |2
+        # ┌─────────────────────────────────────────────────────────────────┐
+        # │  MANAGED BY ANSIBLE — DO NOT EDIT OR REMOVE THIS SECTION       │
+        # │                                                                 │
+        # │  This block is required for Beszel system monitoring to work.  │
+        # │  It is automatically maintained by the beszel_agent Ansible     │
+        # │  role. Any manual changes will be overwritten on the next run.  │
+        # │                                                                 │
+        # │  To update configuration, edit the Ansible role variables:     │
+        # │    ansible/inventory/group_vars/all/vars.yml                   │
+        # └─────────────────────────────────────────────────────────────────┘
         beszel-agent:
           image: henrygd/beszel-agent
           container_name: beszel-agent
