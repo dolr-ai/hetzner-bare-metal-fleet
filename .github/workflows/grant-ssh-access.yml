@@ -8,13 +8,9 @@ on:
         required: true
         type: choice
         options:
-          - jay
           - joel
-          - kevin
-          - mayank
           - naitik
           - ravi
-          - samarth
           - sarvesh
           - shivam
       target_host:
@@ -79,6 +75,6 @@ jobs:
             trap cleanup EXIT
             
             # Grant SSH access
-            ansible-playbook ansible/playbooks/hetzner-ssh-key-grant.yml \
+            ansible-playbook ansible/playbooks/ssh-access.yml \
               --limit "${{ inputs.target_host }}" \
               --extra-vars "team_member_name=${{ inputs.team_member }}"

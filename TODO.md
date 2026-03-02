@@ -1,12 +1,4 @@
-- remove the exited members from the list
-- automatically bump the beszel_agent on the hosts
-- bumpt the beszel hub
-- refactor this entire repo to use roles and then have individual playbooks which are
-    - idempotently provision host
-    - provide ssh access
-    - weekly system update which includes 
-        - updating beszel agent
-        - updating beszel hub
-        - resetting ssh access to only the ones in authorized_keys
+- as part of system update, add a step to update the beszel agent and the beszel hub. This would include updating the images to the latest for the beszel agent and the beszel hub
 - run the system-update playbook on a yral-auth-* host and make sure it works as expected
-- validate the existing github workflow work as expected
+- for the beszel agent docker compose section being added, add guidance via comments in the docker compose file on not to remove it or mess with it as it is required for the beszel agent to work properly
+- clean up individual host vars since we use the universal beszel token for beszel agent provisioning

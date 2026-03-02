@@ -12,10 +12,10 @@ on:
         required: false
         default: false
         type: boolean
-      auto_configure:
-        description: "Run post-provision configuration (SSH, Docker, Beszel)"
+      skip_rescue:
+        description: "Skip rescue activation (if server is already in rescue mode)"
         required: false
-        default: true
+        default: false
         type: boolean
 
 env:
@@ -74,14 +74,7 @@ jobs:
             }
             trap cleanup EXIT
             
-            # Run bare metal provisioning
-            ansible-playbook ansible/playbooks/bare-metal-provision.yml \
+            # Full idempotent provision: rescue → OS install → btrfs RAID 0 → update → ssh → docker → beszel
+            ansible-playbook ansible/playbooks/provision.yml \
               --limit "${{ inputs.target_host }}" \
-              --extra-vars "force_provision=${{ inputs.force_provision }}"
-            
-            # Run post-provision configuration if requested
-            if [ "${{ inputs.auto_configure }}" = "true" ]; then
-              ansible-playbook ansible/playbooks/ssh-security.yml --limit "${{ inputs.target_host }}"
-              ansible-playbook ansible/playbooks/docker-setup.yml --limit "${{ inputs.target_host }}"
-              ansible-playbook ansible/playbooks/beszel-agent-setup.yml --limit "${{ inputs.target_host }}"
-            fi
+              --extra-vars "force_provision=${{ inputs.force_provision }} skip_rescue_activation=${{ inputs.skip_rescue }}"
