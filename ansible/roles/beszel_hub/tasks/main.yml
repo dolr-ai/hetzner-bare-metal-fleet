@@ -1,0 +1,52 @@
+---
+- name: Check if Docker is installed
+  command: docker --version
+  register: docker_check
+  failed_when: false
+  changed_when: false
+
+- name: Fail if Docker is not installed
+  fail:
+    msg: "Docker is not installed on {{ inventory_hostname }}. Cannot update beszel hub."
+  when: docker_check.rc != 0
+
+- name: Check if beszel hub docker-compose file exists
+  stat:
+    path: "{{ beszel_hub_compose_path }}"
+  register: hub_compose_file
+
+- name: Fail if compose file not found
+  fail:
+    msg: "docker-compose.yml not found at {{ beszel_hub_compose_path }} on {{ inventory_hostname }}"
+  when: not hub_compose_file.stat.exists
+
+- name: Pull latest beszel hub image
+  command: docker compose -f {{ beszel_hub_compose_path }} pull {{ beszel_hub_service_name }}
+  args:
+    chdir: /root
+  register: pull_result
+  changed_when: "'Pull complete' in pull_result.stdout or 'Downloaded newer image' in pull_result.stderr or pull_result.rc == 0"
+
+- name: Restart beszel hub with latest image
+  command: docker compose -f {{ beszel_hub_compose_path }} up -d {{ beszel_hub_service_name }}
+  args:
+    chdir: /root
+  register: hub_up_result
+  changed_when: true
+
+- name: Wait for beszel hub container to be running
+  command: "docker inspect --format='{{ '{{' }}.State.Status{{ '}}' }}' {{ beszel_hub_service_name }}"
+  register: hub_status
+  until: hub_status.stdout == "running"
+  retries: 15
+  delay: 5
+  changed_when: false
+
+- name: Display beszel hub container info
+  command: "docker ps --filter name={{ beszel_hub_service_name }} --format 'table {{ '{{' }}.Names{{ '}}' }}\t{{ '{{' }}.Status{{ '}}' }}\t{{ '{{' }}.Image{{ '}}' }}'"
+  register: hub_info
+  changed_when: false
+
+- name: Show beszel hub status
+  debug:
+    msg: "{{ hub_info.stdout_lines }}"

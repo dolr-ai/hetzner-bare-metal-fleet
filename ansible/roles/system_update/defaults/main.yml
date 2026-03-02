@@ -1,0 +1,4 @@
+---
+retry_count: 3
+retry_delay: 10
+enable_reboot: false

@@ -1,0 +1,3 @@
+---
+beszel_hub_compose_path: /root/docker-compose.yml
+beszel_hub_service_name: beszel

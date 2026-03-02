@@ -79,25 +79,26 @@ show_menu() {
     echo "  Local Management Menu"
     echo "=========================================="
     echo ""
-    echo "Provisioning & Configuration:"
-    echo "  1) Provision New Server (from rescue mode)"
-    echo "  2) Configure SSH Security"
-    echo "  3) Install/Update Docker"
-    echo "  4) Deploy Beszel Monitoring Agent"
-    echo "  5) Run System Updates"
+    echo "Primary Playbooks:"
+    echo "  1) Provision new server           (provision.yml)"
+    echo "  2) Weekly maintenance update      (weekly-update.yml)"
+    echo "  3) Grant temporary SSH access     (ssh-access.yml)"
     echo ""
-    echo "Access Management:"
-    echo "  6) Grant Temporary SSH Access"
-    echo "  7) Activate Rescue Mode"
+    echo "Individual Role Playbooks:"
+    echo "  4) System update only             (system-update.yml)"
+    echo "  5) SSH security / reset keys only (ssh-security.yml)"
+    echo "  6) Docker install/verify only     (docker-setup.yml)"
+    echo "  7) Beszel agent deploy only       (beszel-agent-setup.yml)"
+    echo "  8) Activate rescue mode           (hetzner-rescue-activate.yml)"
     echo ""
     echo "Vault Management:"
-    echo "  8) View Vault (group_vars/all/vault.yml)"
-    echo "  9) Edit Vault"
-    echo "  10) Encrypt All Host Vault Files"
+    echo "  9) View Vault (group_vars/all/vault.yml)"
+    echo "  10) Edit Vault"
+    echo "  11) Encrypt All Host Vault Files"
     echo ""
     echo "Utilities:"
-    echo "  11) Test Connectivity (ping all hosts)"
-    echo "  12) List All Hosts"
+    echo "  12) Test Connectivity (ping all hosts)"
+    echo "  13) List All Hosts"
     echo ""
     echo "  0) Exit"
     echo ""
@@ -170,64 +171,69 @@ main() {
             case $choice in
                 1)
                     host=$(get_host_input "Enter hostname to provision") || continue
-                    read -p "Force provision? (yes/no) [no]: " force
-                    force_flag=""
-                    if [ "$force" = "yes" ]; then
-                        force_flag="--extra-vars force_provision=true"
-                    fi
-                    run_playbook "bare-metal-provision.yml" "--limit $host $force_flag"
+                    read -p "Skip rescue activation? (yes/no) [no]: " skip_rescue
+                    read -p "Force re-provision? (yes/no) [no]: " force
+                    extra_flags=""
+                    [ "$skip_rescue" = "yes" ] && extra_flags="$extra_flags --extra-vars skip_rescue_activation=true"
+                    [ "$force" = "yes" ]       && extra_flags="$extra_flags --extra-vars force_provision=true"
+                    run_playbook "provision.yml" "--limit $host $extra_flags"
                     ;;
                 2)
-                    host=$(get_host_input) || continue
-                    run_playbook "ssh-security.yml" "--limit $host"
+                    host=$(get_host_input "Enter hostname/group or 'all' for all hosts") || continue
+                    read -p "Allow automatic reboot? (yes/no) [no]: " reboot
+                    reboot_flag=""
+                    [ "$reboot" = "yes" ] && reboot_flag="--extra-vars enable_reboot=true"
+                    run_playbook "weekly-update.yml" "--limit $host $reboot_flag"
                     ;;
                 3)
                     host=$(get_host_input) || continue
-                    run_playbook "docker-setup.yml" "--limit $host"
-                    ;;
-                4)
-                    host=$(get_host_input) || continue
-                    run_playbook "beszel-agent-setup.yml" "--limit $host"
-                    ;;
-                5)
-                    host=$(get_host_input) || continue
-                    read -p "Allow automatic reboot? (yes/no) [no]: " reboot
-                    reboot_flag=""
-                    if [ "$reboot" = "yes" ]; then
-                        reboot_flag="--extra-vars enable_reboot=true"
-                    fi
-                    run_playbook "system-update.yml" "--limit $host $reboot_flag"
-                    ;;
-                6)
-                    host=$(get_host_input) || continue
-                    echo "Available team members: jay, joel, kevin, naitik, ravi"
+                    echo "Available team members: jay, joel, kevin, mayank, naitik, ravi, samarth, sarvesh, shivam"
                     read -p "Enter team member name: " member
                     if [ -z "$member" ]; then
                         print_error "No team member specified"
                         continue
                     fi
-                    run_playbook "hetzner-ssh-key-grant.yml" "--limit $host --extra-vars team_member_name=$member"
+                    run_playbook "ssh-access.yml" "--limit $host --extra-vars team_member_name=$member"
+                    ;;
+                4)
+                    host=$(get_host_input) || continue
+                    read -p "Allow automatic reboot? (yes/no) [no]: " reboot
+                    reboot_flag=""
+                    [ "$reboot" = "yes" ] && reboot_flag="--extra-vars enable_reboot=true"
+                    run_playbook "system-update.yml" "--limit $host $reboot_flag"
+                    ;;
+                5)
+                    host=$(get_host_input) || continue
+                    run_playbook "ssh-security.yml" "--limit $host"
+                    ;;
+                6)
+                    host=$(get_host_input) || continue
+                    run_playbook "docker-setup.yml" "--limit $host"
                     ;;
                 7)
+                    host=$(get_host_input) || continue
+                    run_playbook "beszel-agent-setup.yml" "--limit $host"
+                    ;;
+                8)
                     host=$(get_host_input "Enter hostname to activate rescue mode for") || continue
                     run_playbook "hetzner-rescue-activate.yml" "--limit $host"
                     ;;
-                8)
-                    print_info "Viewing vault contents..."
-                    ansible-vault view ansible/group_vars/all/vault.yml
-                    ;;
                 9)
-                    print_info "Opening vault for editing..."
-                    ansible-vault edit ansible/group_vars/all/vault.yml
+                    print_info "Viewing vault contents..."
+                    ansible-vault view "$ANSIBLE_DIR/inventory/group_vars/all/vault.yml"
                     ;;
                 10)
-                    encrypt_all_host_vaults
+                    print_info "Opening vault for editing..."
+                    ansible-vault edit "$ANSIBLE_DIR/inventory/group_vars/all/vault.yml"
                     ;;
                 11)
+                    encrypt_all_host_vaults
+                    ;;
+                12)
                     print_info "Testing connectivity to all hosts..."
                     ansible all -m ping
                     ;;
-                12)
+                13)
                     print_info "Listing all hosts in inventory..."
                     ansible-inventory --list
                     ;;

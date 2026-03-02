@@ -1,0 +1,12 @@
+- remove the exited members from the list
+- automatically bump the beszel_agent on the hosts
+- bumpt the beszel hub
+- refactor this entire repo to use roles and then have individual playbooks which are
+    - idempotently provision host
+    - provide ssh access
+    - weekly system update which includes 
+        - updating beszel agent
+        - updating beszel hub
+        - resetting ssh access to only the ones in authorized_keys
+- run the system-update playbook on a yral-auth-* host and make sure it works as expected
+- validate the existing github workflow work as expected
