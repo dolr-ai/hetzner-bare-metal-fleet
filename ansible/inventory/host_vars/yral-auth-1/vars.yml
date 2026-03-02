@@ -1,6 +1,0 @@
----
-# Host-specific variables for yral-auth-1 (138.201.120.111)
-#
-# beszel_agent_token is inherited from group_vars/all/vars.yml using the
-# universal Beszel token (vault_beszel_agent_token in group_vars/all/vault.yml).
-# Override here with a host-specific vault value if needed.

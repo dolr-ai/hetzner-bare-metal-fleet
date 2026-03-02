@@ -30,8 +30,6 @@ ansible/
     group_vars/all/vars.yml     # non-secret shared variables
     group_vars/all/vault.yml    # encrypted vault (ansible-vault AES256)
     group_vars/bare_metal.yml   # connection defaults (ansible_user: root, key path)
-    host_vars/<host>/vars.yml   # references vault_* vars from host vault
-    host_vars/<host>/vault.yml  # per-host encrypted secrets
   roles/                        # all task logic lives here
   playbooks/                    # thin wrappers and orchestrator playbooks
   files/                        # (legacy) — authoritative files now live inside roles
