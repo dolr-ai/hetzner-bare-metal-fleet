@@ -1,9 +1,0 @@
----
-# Thin wrapper — all logic lives in the docker role.
-# Usage: ansible-playbook ansible/playbooks/docker-setup.yml --limit <hostname>
-
-- name: Docker installation and setup
-  hosts: "{{ target | default('all') }}"
-  gather_facts: true
-  roles:
-    - role: docker

@@ -1,9 +1,0 @@
----
-# Thin wrapper — all logic lives in the beszel_agent role.
-# Usage: ansible-playbook ansible/playbooks/beszel-agent-setup.yml --limit <hostname>
-
-- name: Beszel agent setup and update
-  hosts: "{{ target | default('all') }}"
-  gather_facts: true
-  roles:
-    - role: beszel_agent

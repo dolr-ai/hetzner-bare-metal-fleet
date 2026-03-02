@@ -1,9 +1,0 @@
----
-# Thin wrapper — all logic lives in the hetzner_rescue role.
-# Usage: ansible-playbook ansible/playbooks/hetzner-rescue-activate.yml --limit <hostname>
-
-- name: Activate Hetzner rescue mode
-  hosts: "{{ target | default('all') }}"
-  gather_facts: false
-  roles:
-    - role: hetzner_rescue

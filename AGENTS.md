@@ -79,16 +79,13 @@ roles/<name>/
 
 ### Primary Playbooks
 
-Three main playbooks cover the three intended operations:
+Three playbooks cover all intended operations — there are no other playbooks in `ansible/playbooks/`:
 
 | Playbook | Purpose | Key flags |
 |---|---|---|
 | `provision.yml` | Full idempotent bootstrap of a new host | `skip_rescue_activation=true`, `force_provision=true` |
 | `ssh-access.yml` | Grant temporary SSH access to a team member | `team_member_name=<name>` (required) |
 | `weekly-update.yml` | Weekly maintenance: update → agent refresh → hub update → key reset | `enable_reboot=true` |
-
-All other playbooks (e.g., `docker-setup.yml`, `system-update.yml`) are **backwards-compatible thin
-wrappers** over their corresponding role — they exist so existing CI/operator muscle memory is not broken.
 
 ---
 
@@ -142,7 +139,7 @@ These are stored in `ansible/roles/ssh_security/files/authorized_keys`.
 
 **Team member keys** are defined in `group_vars/all/vars.yml` under `team_members`.
 They are added temporarily via the `ssh_key_grant` role and **automatically expelled** the next time
-`ssh_security` runs (weekly-update play 4, or manual `ssh-security.yml` run).
+`ssh_security` runs (weekly-update play 4, or manual `weekly-update.yml` run).
 
 > **Never add team member keys to the canonical `authorized_keys` file.**
 > Temporary access is the intentional model; canonical access requires adding keys to the file

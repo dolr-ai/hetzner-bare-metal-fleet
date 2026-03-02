@@ -4,32 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       target_hosts:
-        description: "Target hosts (specific hostname, group, or 'all')"
+        description: "Target hosts (specific hostname, group, or 'all'). Defaults to all bare_metal hosts."
         required: false
-        default: "all"
+        default: "bare_metal"
         type: string
-      run_system_update:
-        description: "Run system updates"
-        required: false
-        default: true
-        type: boolean
-      run_ssh_security:
-        description: "Configure SSH security"
-        required: false
-        default: true
-        type: boolean
-      run_docker_setup:
-        description: "Install/update Docker"
-        required: false
-        default: false
-        type: boolean
-      run_beszel_agent:
-        description: "Deploy/update Beszel monitoring agent"
-        required: false
-        default: false
-        type: boolean
       enable_reboot:
-        description: "Allow automatic reboot if needed"
+        description: "Allow automatic reboot after system update if required"
         required: false
         default: false
         type: boolean
@@ -92,39 +72,11 @@ jobs:
             }
             trap cleanup EXIT
             
-            # Scheduled runs use the full weekly-update playbook:
-            # update packages → refresh beszel agent → update beszel hub → reset SSH keys
-            if [ "${{ github.event_name }}" = "schedule" ]; then
-              ansible-playbook ansible/playbooks/weekly-update.yml \
-                --extra-vars "enable_reboot=${{ inputs.enable_reboot }}"
-              exit $?
-            fi
-            
-            # Manual dispatch — run only selected operations
+            # Determine target (scheduled runs always hit all bare_metal hosts)
             TARGET="${{ inputs.target_hosts }}"
-            [ -z "$TARGET" ] && TARGET="all"
+            [ -z "$TARGET" ] && TARGET="bare_metal"
             
-            # Run system updates
-            if [ "${{ inputs.run_system_update }}" = "true" ]; then
-              ansible-playbook ansible/playbooks/system-update.yml \
-                --limit "$TARGET" \
-                --extra-vars "enable_reboot=${{ inputs.enable_reboot }}"
-            fi
-            
-            # Configure SSH security
-            if [ "${{ inputs.run_ssh_security }}" = "true" ]; then
-              ansible-playbook ansible/playbooks/ssh-security.yml \
-                --limit "$TARGET"
-            fi
-            
-            # Install/update Docker
-            if [ "${{ inputs.run_docker_setup }}" = "true" ]; then
-              ansible-playbook ansible/playbooks/docker-setup.yml \
-                --limit "$TARGET"
-            fi
-            
-            # Deploy/update Beszel agent
-            if [ "${{ inputs.run_beszel_agent }}" = "true" ]; then
-              ansible-playbook ansible/playbooks/beszel-agent-setup.yml \
-                --limit "$TARGET"
-            fi
+            # Run weekly maintenance: apt upgrade → beszel agent/hub update → SSH key reset
+            ansible-playbook ansible/playbooks/weekly-update.yml \
+              --limit "$TARGET" \
+              --extra-vars "enable_reboot=${{ inputs.enable_reboot }}"

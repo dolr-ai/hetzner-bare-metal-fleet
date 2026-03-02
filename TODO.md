@@ -1,4 +1,3 @@
-- as part of system update, add a step to update the beszel agent and the beszel hub. This would include updating the images to the latest for the beszel agent and the beszel hub
 - run the system-update playbook on a yral-auth-* host and make sure it works as expected
 - for the beszel agent docker compose section being added, add guidance via comments in the docker compose file on not to remove it or mess with it as it is required for the beszel agent to work properly
 - clean up individual host vars since we use the universal beszel token for beszel agent provisioning
