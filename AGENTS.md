@@ -162,11 +162,12 @@ Key patterns used:
 
 ## Execution Patterns
 
-### Serial and failure tolerance
+### Execution and Serial Behaviour
 
-- `system_update` role (and its wrapper): `serial: 1`, `max_fail_percentage: 50` — rolling, one host at a time.
-- `ssh_security` role wrapper: `max_fail_percentage: 50` — tolerates up to half failing.
-- All other plays run parallel (no `serial`).
+- `weekly-update.yml` **Play 1** (apt upgrade + beszel agent): runs **parallel** across all hosts — no `serial`
+- `weekly-update.yml` **Play 2** (reboot): `serial: 1`, `max_fail_percentage: 50` — rolls one host at a time; skipped per-host when not required
+- `ssh_security` play: `max_fail_percentage: 50` — tolerates up to half failing
+- All other plays run parallel (no `serial`)
 
 ### Connection reliability
 
