@@ -41,8 +41,6 @@ ansible/
 .devcontainer/
   devcontainer.json
   postCreate.sh                 # idempotent dev-container bootstrap
-scripts/
-  run-local.sh                  # interactive menu for local operators
 ```
 
 ---
