@@ -8,11 +8,13 @@ on:
         required: true
         type: choice
         options:
+          - ansuman
           - joel
           - naitik
           - ravi
           - sarvesh
           - shivam
+          - sreyas
       target_host:
         description: "Target host (specific hostname or 'all')"
         required: true

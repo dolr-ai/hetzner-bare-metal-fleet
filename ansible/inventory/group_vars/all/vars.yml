@@ -22,6 +22,9 @@ beszel_agent_token: "{{ vault_beszel_agent_token }}"
 
 # Team member SSH keys for temporary access
 team_members:
+  ansuman:
+    email: "ansuman@gobazzinga.io"
+    ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILGb2pAXEJeBmrfgkIKU9egGb5a0bDIYqpazZGnxLV4J ansuman@gobazzinga.io"
   joel:
     email: "joel@gobazzinga.io"
     ssh_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCfknevgb+805mjUliPsHJxbKdCePkUSkhSefgiC6uZjOltQCYo4G8H0il5l53+HNPYptqKTtKResEUBwsK7zOdfItnU9Gyp8Zqzs/GfY4ICyYGfXrgIDk/J41wkSG/0LBmnICu7gM9STETbjKZF7yLwtKlhnJyLHzAtCuH2QKNI2gV4psfsIruT4ZbYPEX0Yn1L63AoxYuOJ+ligqWvkxy91/NJE1qt2Mt9HtWnTp0nsFHfbiomGaqwEKNy+tFWiVJucLHgJ9KoYOUApI2MYn/vZVtbuU4uWz0yQfuFJwNVwDyPu14RrcbZqM8Uwg+x3YnY+sgv4671ajb1mgxh41L2SXYa1pg0wqbq1ah0BtP4aJD3rckaCSmtlfQUs2SY2+eCyLK29WtwALld+XCkFt5VtD94K2ujoOJ1SoAjCCSOYv5XLAbMcZnoa5nX9DO2UQMACRo6XbRO/DnqTCHleC6Kh735ZJNOihN3NOVYIT3nxvHPAOL6Huv+vSlDXUSAd5nMDbHj8WAC1/08LWLqcrLSiDGi4No6DAcl40cH6nF902u0khx8z9IPWBi/p5Ra2xznJG65emXJnThc3Pj29C2FQsWIlaaCOWtGoxSinic+Azp1EJBUIk0sxEsX2xW3wJboYC2MnLBYlVAy07+c6EMCrwEjexBkwJSYEIaqFOt+w== joel@gobazzinga.io"
@@ -37,6 +40,9 @@ team_members:
   shivam:
     email: "shivambhavsar@gobazzinga.io"
     ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBnpCcMpKKwA8oblsTUhy4f7agQwQm3zosOt1SIAdV/+ shivambhavsar@gobazzinga.io"
+  sreyas:
+    email: "sreyas@gobazzinga.io"
+    ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPxoyD5E9FKjoG+TkB6/sSEUJ3/MBIqDnwsIIhjdfMzH sreyas@gobazzinga.io"
 
 # Canonical SSH keys (always included)
 canonical_ssh_keys:
