@@ -73,10 +73,9 @@ jobs:
             # Test vault password with quick decryption
             ansible-vault view --vault-password-file=ansible/.vault_pass ansible/inventory/group_vars/all/vault.yml >/dev/null 2>&1 && echo "✓ Vault password validated successfully" || { echo "ERROR: Vault password test failed - incorrect password"; exit 1; }
             
-            # Extract SSH key from vault (github-actions@yral.com)
-            mkdir -p ~/.ssh
-            ansible-vault view ansible/inventory/group_vars/all/vault.yml | awk '/vault_github_actions_ssh_private_key:/,/-----END OPENSSH PRIVATE KEY-----/' | tail -n +2 | sed 's/^  //' > ~/.ssh/ansible_hetzner_fleet
-            chmod 600 ~/.ssh/ansible_hetzner_fleet
+            # Extract SSH key from vault via postCreate.sh (idempotent; skipped at
+            # container-build time when vault pass was a placeholder, succeeds now)
+            bash .devcontainer/postCreate.sh
             
             # Cleanup function to remove temporary credentials
             cleanup() {
@@ -90,6 +89,10 @@ jobs:
             [ -z "$TARGET" ] && TARGET="bare_metal"
             
             # Run weekly maintenance: apt upgrade → beszel agent/hub update → SSH key reset
+            # inputs.enable_reboot is empty string on scheduled runs (no inputs context),
+            # which Ansible's | bool filter evaluates as false. Fall back to 'true' so
+            # scheduled runs reboot as intended; explicit false from workflow_dispatch is
+            # still honoured because non-empty 'false' is truthy in GHA expressions.
             ansible-playbook ansible/playbooks/weekly-update.yml \
               --limit "$TARGET" \
-              --extra-vars "enable_reboot=${{ inputs.enable_reboot }}"
+              --extra-vars "enable_reboot=${{ inputs.enable_reboot || 'true' }}"
