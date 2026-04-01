@@ -73,9 +73,9 @@ jobs:
             # Test vault password with quick decryption
             ansible-vault view --vault-password-file=ansible/.vault_pass ansible/inventory/group_vars/all/vault.yml >/dev/null 2>&1 && echo "✓ Vault password validated successfully" || { echo "ERROR: Vault password test failed - incorrect password"; exit 1; }
             
-            # Extract SSH key from vault via postCreate.sh (idempotent; skipped at
+            # Extract SSH key from vault via post-create.sh (idempotent; skipped at
             # container-build time when vault pass was a placeholder, succeeds now)
-            bash .devcontainer/postCreate.sh
+            bash .devcontainer/post-create.sh
             
             # Cleanup function to remove temporary credentials
             cleanup() {
