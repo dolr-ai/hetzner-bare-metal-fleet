@@ -6,6 +6,9 @@
 # pipx virtualenv via the devcontainer feature - no pip/PEP-668 concerns here.
 set -euo pipefail
 
+# Ensure pipx and user-installed binaries are on PATH (non-interactive shells may not source profile)
+export PATH="$HOME/.local/bin:$PATH"
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ANSIBLE_DIR="$REPO_ROOT/ansible"
 
