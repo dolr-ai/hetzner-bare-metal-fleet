@@ -6,6 +6,7 @@
 #   ansible-playbook ansible/playbooks/provision.yml --limit <hostname>
 #   ansible-playbook ansible/playbooks/provision.yml --limit <hostname> -e skip_rescue_activation=true
 #   ansible-playbook ansible/playbooks/provision.yml --limit <hostname> -e force_provision=true
+#   ansible-playbook ansible/playbooks/provision.yml --limit <hostname> -e skip_rescue_activation=false -e force_provision=true
 #
 # Variables:
 #   skip_rescue_activation  (bool, default false) — skip Hetzner rescue API call if already in rescue mode
