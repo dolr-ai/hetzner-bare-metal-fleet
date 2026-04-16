@@ -19,27 +19,10 @@
 	"customizations": {
 		"vscode": {
 			"extensions": [
-				"redhat.ansible",
 				"redhat.vscode-yaml",
 				"ms-python.python",
 				"github.vscode-github-actions"
-			],
-			"settings": {
-				"ansible.ansible.path": "ansible",
-				"ansible.validation.enabled": true,
-				"ansible.validation.lint.enabled": true,
-				"yaml.schemas": {
-					"https://raw.githubusercontent.com/ansible/ansible-lint/main/src/ansiblelint/schemas/ansible.json#/$defs/tasks": [
-						"ansible/roles/*/tasks/*.yml",
-						"ansible/roles/*/handlers/*.yml"
-					],
-					"https://raw.githubusercontent.com/ansible/ansible-lint/main/src/ansiblelint/schemas/ansible.json#/$defs/playbook": [
-						"ansible/playbooks/*.yml"
-					]
-				},
-				"editor.formatOnSave": false,
-				"files.insertFinalNewline": true
-			}
+			]
 		}
 	}
 }
