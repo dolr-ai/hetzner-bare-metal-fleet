@@ -4,9 +4,7 @@
 # resets authorized_keys to the canonical set).
 #
 # Usage:
-#   ansible-playbook ansible/playbooks/ssh-access.yml \
-#     --limit <hostname|group> \
-#     -e team_member_name=<name>
+#   ansible-playbook ansible/playbooks/ssh-access.yml --limit <hostname|group> -e team_member_name=<name>
 #
 # Available names: see team_members in ansible/inventory/group_vars/all/vars.yml
 
