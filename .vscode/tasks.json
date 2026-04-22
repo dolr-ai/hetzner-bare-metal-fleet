@@ -42,6 +42,32 @@
                 "panel": "dedicated"
             },
             "problemMatcher": []
+        },
+        {
+            "label": "Vault: decrypt",
+            "type": "shell",
+            "command": "ansible-vault decrypt ansible/inventory/group_vars/all/vault.yml",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Vault: encrypt",
+            "type": "shell",
+            "command": "ansible-vault encrypt ansible/inventory/group_vars/all/vault.yml",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "problemMatcher": []
         }
     ],
     "inputs": [

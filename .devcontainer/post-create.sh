@@ -12,10 +12,15 @@ export PATH="$HOME/.local/bin:$PATH"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ANSIBLE_DIR="$REPO_ROOT/ansible"
 
-echo "==> [1/4] Installing ansible-lint (isolated pipx env)"
+echo "==> [1/5] Configuring direnv shell hook"
+if ! grep -Fq 'eval "$(direnv hook bash)"' "$HOME/.bashrc"; then
+  echo 'eval "$(direnv hook bash)"' >> "$HOME/.bashrc"
+fi
+
+echo "==> [2/5] Installing ansible-lint (isolated pipx env)"
 pipx install ansible-lint --quiet 2>/dev/null || pipx upgrade ansible-lint --quiet
 
-echo "==> [2/4] Installing Ansible collections"
+echo "==> [3/5] Installing Ansible collections"
 # requirements.yml may be added later; guard against absence
 REQUIREMENTS="$ANSIBLE_DIR/requirements.yml"
 if [ -f "$REQUIREMENTS" ]; then
@@ -24,7 +29,7 @@ else
   echo "     No $REQUIREMENTS found - skipping collection install"
 fi
 
-echo "==> [3/4] Creating vault password placeholder (if absent)"
+echo "==> [4/5] Creating vault password placeholder (if absent)"
 VAULT_PASS="$ANSIBLE_DIR/.vault_pass"
 if [ ! -f "$VAULT_PASS" ]; then
   echo "REPLACE_WITH_VAULT_PASSWORD" > "$VAULT_PASS"
@@ -36,10 +41,10 @@ else
   echo "     $VAULT_PASS already exists - permissions ensured (600)"
 fi
 
-echo "==> [4/4] Extracting Ansible SSH key (if vault is unlocked)"
+echo "==> [5/5] Extracting Ansible SSH key and generating .env (if vault is unlocked)"
 VAULT_CONTENT=$(cat "$VAULT_PASS" 2>/dev/null || true)
 if [ "$VAULT_CONTENT" = "REPLACE_WITH_VAULT_PASSWORD" ] || [ -z "$VAULT_CONTENT" ]; then
-  echo "     Vault password not set — skipping SSH key extraction"
+  echo "     Vault password not set - skipping SSH key extraction and .env generation"
 else
   mkdir -p ~/.ssh
   if ansible-vault view "$ANSIBLE_DIR/inventory/group_vars/all/vault.yml" \
@@ -51,7 +56,17 @@ else
     echo "     SSH key written to ~/.ssh/ansible_hetzner_fleet"
   else
     rm -f ~/.ssh/ansible_hetzner_fleet
-    echo "     WARNING: Failed to extract SSH key from vault — check vault password"
+    echo "     WARNING: Failed to extract SSH key from vault - check vault password"
+  fi
+
+  if ansible-playbook "$REPO_ROOT/ansible/playbooks/setup-dev-env.yml" \
+      --vault-password-file="$VAULT_PASS" >/dev/null 2>&1; then
+    chmod 600 "$REPO_ROOT/.env"
+    echo "     .env generated from vault (.envrc will load it)"
+
+    direnv allow "$REPO_ROOT" >/dev/null 2>&1 || true
+  else
+    echo "     WARNING: Failed to generate .env from vault"
   fi
 fi
 
