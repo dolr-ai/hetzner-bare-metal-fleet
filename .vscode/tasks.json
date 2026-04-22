@@ -1,0 +1,110 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Playbook: provision.yml",
+            "type": "shell",
+            "command": "ansible-playbook ansible/playbooks/provision.yml --limit ${input:provisionHost} --extra-vars \"skip_rescue_activation=${input:skipRescue} force_provision=${input:forceProvision}\"",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Playbook: ssh-access.yml",
+            "type": "shell",
+            "command": "ansible-playbook ansible/playbooks/ssh-access.yml --limit ${input:sshHost} --extra-vars \"team_member_name=${input:teamMember}\"",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Playbook: weekly-update.yml",
+            "type": "shell",
+            "command": "ansible-playbook ansible/playbooks/weekly-update.yml --limit ${input:weeklyTarget} --extra-vars \"enable_reboot=${input:enableReboot}\"",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "problemMatcher": []
+        }
+    ],
+    "inputs": [
+        {
+            "id": "provisionHost",
+            "type": "promptString",
+            "description": "Target hostname to provision (must exist in inventory)",
+            "default": ""
+        },
+        {
+            "id": "skipRescue",
+            "type": "pickString",
+            "description": "skip_rescue_activation — skip Hetzner rescue API call if server is already in rescue mode",
+            "options": [
+                "false",
+                "true"
+            ],
+            "default": "false"
+        },
+        {
+            "id": "forceProvision",
+            "type": "pickString",
+            "description": "force_provision — re-provision even if marker file exists (DESTRUCTIVE)",
+            "options": [
+                "false",
+                "true"
+            ],
+            "default": "true"
+        },
+        {
+            "id": "sshHost",
+            "type": "promptString",
+            "description": "Target hostname or group to grant SSH access on",
+            "default": ""
+        },
+        {
+            "id": "teamMember",
+            "type": "pickString",
+            "description": "team_member_name — team member to grant temporary SSH access to",
+            "options": [
+                "ansuman",
+                "naitik",
+                "prakash",
+                "rishi",
+                "sarvesh"
+            ],
+            "default": ""
+        },
+        {
+            "id": "weeklyTarget",
+            "type": "promptString",
+            "description": "Target hosts to run weekly update on (hostname, group, or leave blank for bare_metal)",
+            "default": "bare_metal"
+        },
+        {
+            "id": "enableReboot",
+            "type": "pickString",
+            "description": "enable_reboot — allow automatic reboot after system update if required",
+            "options": [
+                "true",
+                "false"
+            ],
+            "default": "true"
+        }
+    ]
+}
