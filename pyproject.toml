@@ -1,6 +1,6 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "hetzner-bare-metal-fleet"
@@ -12,5 +12,5 @@ dependencies = [
     "netaddr",
 ]
 
-[tool.hatch.build.targets.wheel]
+[tool.setuptools]
 packages = []
