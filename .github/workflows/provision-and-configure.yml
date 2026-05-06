@@ -25,54 +25,49 @@ env:
 jobs:
   provision:
     name: Provision Server
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup Ansible environment
+        run: bash setup.sh
 
       - name: Provision and configure server
-        uses: devcontainers/ci@v0.3
-        with:
-          imageName: ghcr.io/dolr-ai/hetzner-fleet-devcontainer
-          cacheFrom: ghcr.io/dolr-ai/hetzner-fleet-devcontainer
-          push: filter
-          runCmd: |
-            set -e
-            
-            # Enable colored output for Ansible
-            export ANSIBLE_FORCE_COLOR=true
-            
-            # Set up vault password
-            echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > ansible/.vault_pass
-            chmod 600 ansible/.vault_pass
-            
-            # Validate vault password file
-            [ -s ansible/.vault_pass ] || { echo "ERROR: Vault password file is empty - GitHub secret may not be set"; exit 1; }
-            echo "✓ Vault password file created ($(wc -c < ansible/.vault_pass) bytes)"
-            
-            # Test vault password with quick decryption
-            ansible-vault view --vault-password-file=ansible/.vault_pass ansible/inventory/group_vars/all/vault.yml >/dev/null 2>&1 && echo "✓ Vault password validated successfully" || { echo "ERROR: Vault password test failed - incorrect password"; exit 1; }
-            
-            # Extract SSH key from vault via post-create.sh (idempotent; skipped at
-            # container-build time when vault pass was a placeholder, succeeds now)
-            bash .devcontainer/post-create.sh
-            
-            # Cleanup function to remove temporary credentials
-            cleanup() {
-              rm -f ~/.ssh/ansible_hetzner_fleet
-              rm -f ansible/.vault_pass
-            }
-            trap cleanup EXIT
-            
-            # Full idempotent provision: rescue → OS install → btrfs RAID 0 → update → ssh → docker → beszel
-            ansible-playbook ansible/playbooks/provision.yml \
-              --limit "${{ inputs.target_host }}" \
-              --extra-vars "force_provision=${{ inputs.force_provision }} skip_rescue_activation=${{ inputs.skip_rescue }}"
+        env:
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          set -e
+
+          # Set up vault password
+          echo "$ANSIBLE_VAULT_PASSWORD" > ansible/.vault_pass
+          chmod 600 ansible/.vault_pass
+
+          # Validate vault password file
+          [ -s ansible/.vault_pass ] || { echo "ERROR: Vault password file is empty - GitHub secret may not be set"; exit 1; }
+          echo "✓ Vault password file created ($(wc -c < ansible/.vault_pass) bytes)"
+
+          # Test vault password with quick decryption
+          ansible-vault view --vault-password-file=ansible/.vault_pass ansible/inventory/group_vars/all/vault.yml >/dev/null 2>&1 \
+            && echo "✓ Vault password validated successfully" \
+            || { echo "ERROR: Vault password test failed - incorrect password"; exit 1; }
+
+          # Extract SSH key from vault
+          mkdir -p ~/.ssh
+          ansible-vault view ansible/inventory/group_vars/all/vault.yml \
+            | awk '/vault_github_actions_ssh_private_key:/,/-----END OPENSSH PRIVATE KEY-----/' \
+            | tail -n +2 | sed 's/^  //' > ~/.ssh/ansible_hetzner_fleet
+          chmod 600 ~/.ssh/ansible_hetzner_fleet
+
+          # Cleanup function to remove temporary credentials
+          cleanup() {
+            rm -f ~/.ssh/ansible_hetzner_fleet
+            rm -f ansible/.vault_pass
+          }
+          trap cleanup EXIT
+
+          # Full idempotent provision: rescue → OS install → btrfs RAID 0 → update → ssh → docker → beszel
+          ansible-playbook ansible/playbooks/provision.yml \
+            --limit "${{ inputs.target_host }}" \
+            --extra-vars "force_provision=${{ inputs.force_provision }} skip_rescue_activation=${{ inputs.skip_rescue }}"
