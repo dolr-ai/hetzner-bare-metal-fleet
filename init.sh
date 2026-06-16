@@ -102,6 +102,6 @@ echo "Starting installimage..."
     -d "$DRIVE_TO_USE" \
     -f yes \
     -t yes \
-    -i /root/images/Ubuntu-2404-noble-amd64-base.tar.gz
+    -i /root/images/Ubuntu-resolute-latest-amd64-base.tar.gz
 
 echo "Installation complete!"
