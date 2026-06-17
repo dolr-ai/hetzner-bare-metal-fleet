@@ -33,7 +33,7 @@ team_members:
     ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICetWiHXjTBs+Xw7k024xV5YGaIxtQiAk6O+Ge2OZ0kU prakash@gobazzinga.io"
   sarvesh:
     email: "sarvesh@gobazzinga.io"
-    ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICbzdGvEwbNzK61s7dEEpTq6AO6qHZUCi6+jgnsIsZuh sarvesh@gobazzinga.io"
+    ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGPshcyPLqPEHcHnb3cM2VC9NDj+UYNwKlIDqtlsBGNR sarvesh@gobazzinga.io"
   rishi:
     email: "rishi@gobazzinga.io"
     ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE6RhsV0UkNgy/ngh2IyW4DOmnsyo3GgBvq/2eM8RLP9 rishi@gobazzinga.io"
