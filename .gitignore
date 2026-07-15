@@ -7,7 +7,6 @@ ansible/ansible.log
 
 # Local development environment
 .env
-.direnv/
 
 # Ansible retry files
 ansible/retry/*.retry
