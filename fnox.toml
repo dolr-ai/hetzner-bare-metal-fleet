@@ -1,33 +1,22 @@
-# fnox — project secret management.
-# Plaintext values are inline; secret values are age-encrypted.
-# The age provider public key is configured below. The private key
-# must be available via FNOX_AGE_KEY env var or ~/.config/fnox/age.txt.
-# Docs: https://github.com/jdx/fnox
+#:schema https://fnox.jdx.dev/schema.json
 
-root = true
-default_provider = "age"
+# Secrets for local development — age-encrypted ciphertext, safe to commit.
+# Plaintext values are in mise.toml [env]; only secrets go here.
+#
+# One-time setup:
+#   1. mise run bootstrap  — extracts infra SSH key to .hetzner-infra-ed25519 (repo-local, gitignored)
+#   2. fnox set <KEY> --provider age  — encrypt each secret into this file
+#   3. Verify: fnox get HETZNER_ROBOT_PASSWORD
+#
+# FNOX_AGE_KEY_FILE is set in mise.toml [env] (./.hetzner-infra-ed25519) — fnox picks it up automatically.
 
-# ── Providers ──────────────────────────────────────────────────────────────
-# Age encryption — secrets are encrypted inline and safe to commit.
-# Replace the recipient below with your age public key:
-#   age-keygen -o ~/.config/fnox/age.txt
-#   grep "public key:" ~/.config/fnox/age.txt
 [providers.age]
 type = "age"
+# Uses the infra SSH key (Ansible vault_github_actions_ssh_private_key).
+# The private key is extracted to ./.hetzner-infra-ed25519 (repo-local, gitignored) by mise run bootstrap.
+# To add team members, append their ssh-ed25519 public key and run: fnox reencrypt -p age
 recipients = [
-  # age1...  ← replace with your public key
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIM/H7Jp2RgC1xtg1nyzpmhzOTmUz3n+PQPsk83BzUskg github-actions@yral.com",
 ]
 
-# ── Secrets ────────────────────────────────────────────────────────────────
-# Plaintext (non-secret) values are inline. Secret values should be set
-# via `fnox set <NAME> "value"` which encrypts them with age.
 [secrets]
-
-# Example plaintext value:
-# [secrets.ANSIBLE_HOST_KEY_CHECKING]
-# default = "False"
-
-# Example age-encrypted secret (set via: fnox set HETZNER_ROBOT_PASSWORD "secret"):
-# [secrets.HETZNER_ROBOT_PASSWORD]
-# provider = "age"
-# value = "-----BEGIN AGE ENCRYPTED FILE----- ..."

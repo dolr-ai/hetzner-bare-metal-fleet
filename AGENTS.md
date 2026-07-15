@@ -248,17 +248,17 @@ No per-host `vars.yml` or `vault.yml` is needed unless the host requires host-sp
 All project dev tools are managed **declaratively** by [mise](https://mise.jdx.dev) via `mise.toml`:
 
 - Python 3.12
-- Ansible (full community package, via pipx backend with `--include-deps`)
-- ansible-lint (via pipx backend)
+- Ansible + ansible-lint (pip-installed into `.venv` by the `bootstrap` mise task)
 - GitHub CLI (`gh`)
 - fnox (secret management)
 - age (encryption for fnox)
 
 Secrets are managed by [fnox](https://github.com/jdx/fnox) via `fnox.toml`:
 
-- Plaintext (non-secret) values are inline in `fnox.toml`
-- Secret values are age-encrypted inline (safe to commit)
-- The `fnox-env` mise plugin automatically loads fnox secrets into the shell
+- Plaintext (non-secret) values live inline in `mise.toml` `[env]`
+- Secret values are age-encrypted inline in `fnox.toml` (safe to commit)
+- The age provider uses the infra SSH key (`vault_github_actions_ssh_private_key` from Ansible vault)
+- `FNOX_AGE_KEY_FILE` in `mise.toml [env]` points to `./.hetzner-infra-ed25519` (extracted by `mise run bootstrap`, gitignored)
 - Per-developer overrides go in `fnox.local.toml` (gitignored)
 
 **First-time setup:**
@@ -266,22 +266,18 @@ Secrets are managed by [fnox](https://github.com/jdx/fnox) via `fnox.toml`:
 # 1. Activate mise in your shell (once)
 eval "$(mise activate bash)"   # or zsh/fish
 
-# 2. Generate an age key for fnox
-age-keygen -o ~/.config/fnox/age.txt
-export FNOX_AGE_KEY=$(grep "AGE-SECRET-KEY" ~/.config/fnox/age.txt)
-
-# 3. Add your age public key to fnox.toml recipients, then encrypt secrets:
-fnox set HETZNER_ROBOT_PASSWORD "your-password"
-
-# 4. Run the setup script
-./setup.sh
-
-# 5. Replace the vault password placeholder
+# 2. Create vault password file (placeholder — replace with real password)
 echo 'real-vault-password' > ansible/.vault_pass
 chmod 600 ansible/.vault_pass
+
+# 3. Run setup (installs tools, creates .venv, extracts infra SSH key from vault)
+./setup.sh        # thin wrapper for `mise run setup`
+
+# 4. Encrypt secrets into fnox.toml (one-time per secret)
+fnox set HETZNER_ROBOT_PASSWORD "your-password" --provider age
 ```
 
-`setup.sh` is idempotent — re-running it is safe.
+`setup.sh` is a thin wrapper that delegates to `mise run setup`. All setup logic lives in `mise.toml` tasks — do not add logic to `setup.sh`.
 
 ---
 

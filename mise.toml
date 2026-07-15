@@ -3,22 +3,10 @@
 # Or prefix any command with `mise x --`.
 # Docs: https://mise.jdx.dev
 
-[plugins]
-# fnox env plugin — automatically loads fnox-managed secrets into the shell.
-# Requires `tools = true` so the plugin can find the mise-managed fnox binary.
-fnox-env = "https://github.com/jdx/mise-env-fnox"
-
 [tools]
-# Python runtime used by Ansible and the pipx-backed CLIs below.
+# Python runtime — Ansible and ansible-lint are pip-installed into .venv
+# by the `bootstrap` task (see below). No pipx/uv needed.
 python = "3.12"
-
-# Ansible (full community package) installed in an isolated venv.
-# Uses uvx (uv tool install) under the hood — dependencies are installed
-# automatically, so no --include-deps flag is needed (unlike raw pipx).
-"pipx:ansible" = "latest"
-
-# Linter for Ansible playbooks/roles.
-"pipx:ansible-lint" = "latest"
 
 # GitHub CLI.
 gh = "latest"
@@ -30,39 +18,57 @@ fnox = "latest"
 # age — modern file encryption tool used by fnox for encrypting secrets.
 age = "latest"
 
-# uv — required runtime dependency for mise's pipx backend (used to install
-# ansible and ansible-lint above in isolated venvs). Also useful for
-# one-off `uvx` commands.
-uv = "latest"
-
 [env]
-# Load fnox-managed secrets into the environment automatically.
-# `tools = true` ensures the plugin runs after mise tools are on PATH.
-# Plaintext values live inline in fnox.toml; secrets are age-encrypted.
-_.fnox-env = { tools = true }
+# Put the project .venv on PATH so `ansible`, `ansible-lint`, etc. are available.
+_.path = '.venv/bin'
+
+# fnox age decryption — private key extracted by `mise run bootstrap`.
+# Uses {{config_root}} so the path resolves to the repo root regardless of cwd.
+FNOX_AGE_KEY_FILE = '{{config_root}}/.hetzner-infra-ed25519'
 
 # Ensure Ansible finds the project config and collections without extra flags.
 ANSIBLE_CONFIG = "{{ config_root }}/ansible.cfg"
 ANSIBLE_COLLECTIONS_PATH = "{{ config_root }}/ansible/collections"
 
 # ── Tasks ──────────────────────────────────────────────────────────────────
-# Run with:  mise run <task>      (e.g. `mise run install`)
+# Run with:  mise run <task>      (e.g. `mise run setup`)
 
-[tasks.install]
-description = "Install all mise-managed tools and Ansible Galaxy collections"
-run = [
-    "mise install",
-    "ansible-galaxy collection install -r ansible/requirements.yml --collections-path ansible/collections",
-]
+[tasks.bootstrap]
+description = "Create .venv, install Python tooling, and extract infra SSH key from vault"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Create venv and install Python tooling
+python -m venv .venv && ./.venv/bin/pip install --upgrade pip && ./.venv/bin/pip install ansible-core ansible-lint && ./.venv/bin/ansible-galaxy collection install -r ansible/requirements.yml -p ansible/collections
+
+# Extract infra SSH private key from Ansible vault → ./.hetzner-infra-ed25519 (repo-local, gitignored)
+# Used by fnox (age provider) to decrypt secrets. Idempotent — skips if already present.
+if [ -f ansible/.vault_pass ] && [ ! -f .hetzner-infra-ed25519 ]; then
+  ./.venv/bin/ansible-vault view ansible/inventory/group_vars/all/vault.yml --vault-password-file ansible/.vault_pass | \
+    ./.venv/bin/python -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['vault_github_actions_ssh_private_key'])" \
+    > .hetzner-infra-ed25519
+  chmod 600 .hetzner-infra-ed25519
+  echo '  ✓ Extracted infra SSH key to .hetzner-infra-ed25519'
+elif [ -f .hetzner-infra-ed25519 ]; then
+  echo '  ✓ Infra SSH key already at .hetzner-infra-ed25519'
+else
+  echo '  ⚠ Vault password file not found at ansible/.vault_pass — skipping infra SSH key extraction'
+fi
+'''
 sources = ["mise.toml", "ansible/requirements.yml"]
+
+[tasks.setup]
+description = "Install repo toolchain and Python tooling (full idempotent bootstrap)"
+run = "mise install && mise run bootstrap && echo 'Environment is ready'"
 
 [tasks.vault-decrypt]
 description = "Decrypt the Ansible vault for editing"
-run = "ansible-vault decrypt ansible/inventory/group_vars/all/vault.yml"
+run = "./.venv/bin/ansible-vault decrypt ansible/inventory/group_vars/all/vault.yml"
 
 [tasks.vault-encrypt]
 description = "Re-encrypt the Ansible vault after editing"
-run = "ansible-vault encrypt ansible/inventory/group_vars/all/vault.yml"
+run = "./.venv/bin/ansible-vault encrypt ansible/inventory/group_vars/all/vault.yml"
 
 [tasks.vault-setup]
 description = "Create ansible/.vault_pass placeholder if missing"

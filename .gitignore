@@ -8,9 +8,8 @@ ansible/ansible.log
 # fnox local overrides (per-developer secret values)
 fnox.local.toml
 
-# Age key files (never commit private keys)
-*.age.txt
-age.txt
+# Infra SSH key extracted from vault by `mise run bootstrap` (never commit)
+.hetzner-infra-ed25519
 
 # Ansible retry files
 ansible/retry/*.retry
