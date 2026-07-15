@@ -5,8 +5,12 @@ ansible/.vault_pass
 # Ansible logs
 ansible/ansible.log
 
-# Local development environment
-.env
+# fnox local overrides (per-developer secret values)
+fnox.local.toml
+
+# Age key files (never commit private keys)
+*.age.txt
+age.txt
 
 # Ansible retry files
 ansible/retry/*.retry

@@ -1,0 +1,33 @@
+# fnox — project secret management.
+# Plaintext values are inline; secret values are age-encrypted.
+# The age provider public key is configured below. The private key
+# must be available via FNOX_AGE_KEY env var or ~/.config/fnox/age.txt.
+# Docs: https://github.com/jdx/fnox
+
+root = true
+default_provider = "age"
+
+# ── Providers ──────────────────────────────────────────────────────────────
+# Age encryption — secrets are encrypted inline and safe to commit.
+# Replace the recipient below with your age public key:
+#   age-keygen -o ~/.config/fnox/age.txt
+#   grep "public key:" ~/.config/fnox/age.txt
+[providers.age]
+type = "age"
+recipients = [
+  # age1...  ← replace with your public key
+]
+
+# ── Secrets ────────────────────────────────────────────────────────────────
+# Plaintext (non-secret) values are inline. Secret values should be set
+# via `fnox set <NAME> "value"` which encrypts them with age.
+[secrets]
+
+# Example plaintext value:
+# [secrets.ANSIBLE_HOST_KEY_CHECKING]
+# default = "False"
+
+# Example age-encrypted secret (set via: fnox set HETZNER_ROBOT_PASSWORD "secret"):
+# [secrets.HETZNER_ROBOT_PASSWORD]
+# provider = "age"
+# value = "-----BEGIN AGE ENCRYPTED FILE----- ..."

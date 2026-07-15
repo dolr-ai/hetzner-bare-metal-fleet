@@ -33,10 +33,10 @@ ansible/
   roles/                        # all task logic lives here
   playbooks/                    # thin wrappers and orchestrator playbooks
   files/                        # (legacy) — authoritative files now live inside roles
-  .vault_pass                   # gitignored; populated by postCreate.sh placeholder
-.devcontainer/
-  devcontainer.json
-  postCreate.sh                 # idempotent dev-container bootstrap
+  .vault_pass                   # gitignored; populated by setup.sh placeholder
+mise.toml                       # project dev tools, env vars, and tasks (mise)
+fnox.toml                       # project secrets — plaintext inline, secrets age-encrypted
+setup.sh                        # idempotent local setup (mise install + galaxy + vault pass)
 ```
 
 ---
@@ -243,24 +243,45 @@ No per-host `vars.yml` or `vault.yml` is needed unless the host requires host-sp
 
 ---
 
-## Dev Container Setup
+## Local Development Setup (mise + fnox)
 
-The dev container (`devcontainer.json` + `postCreate.sh`) installs:
+All project dev tools are managed **declaratively** by [mise](https://mise.jdx.dev) via `mise.toml`:
 
-- Ansible (via devcontainer feature `ghcr.io/devcontainers-extra/features/ansible:2`)
-- GitHub CLI (via devcontainer feature)
-- Ansible runtime libraries `passlib`, `jmespath`, `netaddr` injected into Ansible's pipx
-  virtualenv via the feature's `injections` option — runs at image build time as root, no PEP 668 issues
-- `ansible-lint` via `pipx` in `postCreate.sh` (isolated env, also no PEP 668 issues)
-- Ansible Galaxy collections (from `ansible/requirements.yml` when present)
+- Python 3.12
+- Ansible (full community package, via pipx backend with `--include-deps`)
+- ansible-lint (via pipx backend)
+- GitHub CLI (`gh`)
+- fnox (secret management)
+- age (encryption for fnox)
 
-`postCreate.sh` is idempotent — re-running it is safe.
+Secrets are managed by [fnox](https://github.com/jdx/fnox) via `fnox.toml`:
 
-After container creation, replace the vault password placeholder:
+- Plaintext (non-secret) values are inline in `fnox.toml`
+- Secret values are age-encrypted inline (safe to commit)
+- The `fnox-env` mise plugin automatically loads fnox secrets into the shell
+- Per-developer overrides go in `fnox.local.toml` (gitignored)
+
+**First-time setup:**
 ```bash
+# 1. Activate mise in your shell (once)
+eval "$(mise activate bash)"   # or zsh/fish
+
+# 2. Generate an age key for fnox
+age-keygen -o ~/.config/fnox/age.txt
+export FNOX_AGE_KEY=$(grep "AGE-SECRET-KEY" ~/.config/fnox/age.txt)
+
+# 3. Add your age public key to fnox.toml recipients, then encrypt secrets:
+fnox set HETZNER_ROBOT_PASSWORD "your-password"
+
+# 4. Run the setup script
+./setup.sh
+
+# 5. Replace the vault password placeholder
 echo 'real-vault-password' > ansible/.vault_pass
 chmod 600 ansible/.vault_pass
 ```
+
+`setup.sh` is idempotent — re-running it is safe.
 
 ---
 
@@ -274,6 +295,18 @@ chmod 600 ansible/.vault_pass
 | Vault vars | `vault_` prefix | `vault_beszel_agent_token` |
 | Host names | `kebab-case` | `clickhouse-keeper-1`, `uptime-monitor-1` |
 | Role file assets | `snake_case` or `kebab-case` matching their purpose | `cleanup_beszel.py`, `authorized_keys` |
+
+---
+
+## Declarative over Imperative
+
+**Always prefer declarative configuration over imperative scripts.**
+
+- Tools, versions, env vars, and tasks are declared in `mise.toml` — not installed via ad-hoc shell commands.
+- Secrets are declared in `fnox.toml` — not injected via `.env` files or runtime scripts.
+- When adding a new tool or dependency, add it to `mise.toml` `[tools]` rather than calling `brew install`, `pip install`, or `apt install` in a script.
+- When adding a new secret, use `fnox set` to encrypt it into `fnox.toml` rather than creating `.env` files.
+- The `setup.sh` script should only orchestrate declarative tools (`mise install`, `ansible-galaxy`) and handle one-off bootstrap (vault password placeholder) — not install tools imperatively.
 
 ---
 
