@@ -17,7 +17,7 @@
       If you want to re-provision this server anyway, run the playbook with:
         -e force_provision=true
 
-      This will wipe the server and install a fresh Ubuntu 24.04 system.
+      This will wipe the server and install a fresh Ubuntu 26.04 system.
   when:
     - provision_check.stdout is defined
     - provision_check.stdout | trim == 'provisioned'
@@ -70,20 +70,44 @@
       Drive: {{ drive_to_use }} (auto-detected)
       This will take approximately 10-15 minutes.
 
+- name: Copy provisioning script to rescue system
+  ansible.builtin.copy:
+    src: init.sh
+    dest: /root/init.sh
+    mode: "0755"
+
 - name: Run bare metal provisioning script
   ansible.builtin.shell: |
     export MACHINE_HOSTNAME='{{ inventory_hostname }}'
     export DRIVE_TO_USE='{{ drive_to_use }}'
-    curl -fsSL https://raw.githubusercontent.com/dolr-ai/hetzner-bare-metal-fleet/refs/heads/main/init.sh | bash
+    /root/init.sh
   register: provision_result
   async: 1200
   poll: 30
   changed_when: true
+  # async/poll status is unreliable — the real pass/fail check is the
+  # success message in stdout (see "Check installation success" below).
+  failed_when: false
+
+- name: Remove provisioning script
+  ansible.builtin.file:
+    path: /root/init.sh
+    state: absent
+  changed_when: false
   failed_when: false
 
 - name: Check installation success
   ansible.builtin.fail:
-    msg: "Installation failed - success message not found in output"
+    msg: |
+      Installation failed - success message not found in output.
+
+      RC: {{ provision_result.rc | default('N/A') }}
+
+      stdout:
+      {{ provision_result.stdout | default('NO STDOUT') }}
+
+      stderr:
+      {{ provision_result.stderr | default('NO STDERR') }}
   when: >
     provision_result.stdout is not defined or
     ('INSTALLATION COMPLETE' not in provision_result.stdout and

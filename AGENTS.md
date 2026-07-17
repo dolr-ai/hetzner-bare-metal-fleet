@@ -9,7 +9,7 @@ respected to keep the fleet automation consistent, idempotent, and safe.
 ## Repository Overview
 
 This repository manages a fleet of Hetzner bare-metal servers using Ansible.
-All servers run Ubuntu 24.04, are reachable as `root` via SSH key, and belong to the `bare_metal`
+All servers run Ubuntu 26.04, are reachable as `root` via SSH key, and belong to the `bare_metal`
 inventory group.  All hosts are treated equally — there are no sub-groups with special behaviour.
 
 | Group | Purpose |
