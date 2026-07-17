@@ -39,27 +39,40 @@ run = '''
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Create venv and install Python tooling
+# Ensure vault password file exists (placeholder if missing — user must replace with real password)
+if [ ! -f ansible/.vault_pass ]; then
+  echo "REPLACE_WITH_VAULT_PASSWORD" > ansible/.vault_pass
+  chmod 600 ansible/.vault_pass
+  echo '  ⚠ Created ansible/.vault_pass placeholder — replace with real vault password to extract SSH key'
+fi
+
+# Create venv and install Python tooling (idempotent — venv module updates in place)
 python -m venv .venv && ./.venv/bin/pip install --upgrade pip && ./.venv/bin/pip install ansible-core ansible-lint && ./.venv/bin/ansible-galaxy collection install -r ansible/requirements.yml -p ansible/collections
 
 # Extract infra SSH private key from Ansible vault → ./.hetzner-infra-ed25519 (repo-local, gitignored)
 # Used by fnox (age provider) to decrypt secrets. Idempotent — skips if already present.
-if [ -f ansible/.vault_pass ] && [ ! -f .hetzner-infra-ed25519 ]; then
-  ./.venv/bin/ansible-vault view ansible/inventory/group_vars/all/vault.yml --vault-password-file ansible/.vault_pass | \
-    ./.venv/bin/python -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['vault_github_actions_ssh_private_key'])" \
-    > .hetzner-infra-ed25519
-  chmod 600 .hetzner-infra-ed25519
-  echo '  ✓ Extracted infra SSH key to .hetzner-infra-ed25519'
-elif [ -f .hetzner-infra-ed25519 ]; then
-  echo '  ✓ Infra SSH key already at .hetzner-infra-ed25519'
+# Resilient to wrong/placeholder vault passwords — prints warning instead of failing.
+if [ ! -f .hetzner-infra-ed25519 ]; then
+  if ./.venv/bin/ansible-vault view ansible/inventory/group_vars/all/vault.yml --vault-password-file ansible/.vault_pass 2>/dev/null | \
+     ./.venv/bin/python -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['vault_github_actions_ssh_private_key'])" \
+     > .hetzner-infra-ed25519 2>/dev/null; then
+    chmod 600 .hetzner-infra-ed25519
+    echo '  ✓ Extracted infra SSH key to .hetzner-infra-ed25519'
+  else
+    rm -f .hetzner-infra-ed25519
+    echo '  ⚠ Vault decryption failed — check ansible/.vault_pass contains the correct password'
+  fi
 else
-  echo '  ⚠ Vault password file not found at ansible/.vault_pass — skipping infra SSH key extraction'
+  echo '  ✓ Infra SSH key already at .hetzner-infra-ed25519'
 fi
 '''
-sources = ["mise.toml", "ansible/requirements.yml"]
+# `ansible/.vault_pass` in sources ensures re-run when the user creates/updates the vault password.
+# `.venv` in outputs enables fast-skipping when nothing changed.
+sources = ["mise.toml", "ansible/requirements.yml", "ansible/.vault_pass"]
+outputs = [".venv", ".hetzner-infra-ed25519"]
 
 [tasks.setup]
-description = "Install repo toolchain and Python tooling (full idempotent bootstrap)"
+description = "Explicit full setup: install tools + run bootstrap (also runs automatically on cd via [hooks] enter)"
 run = "mise install && mise run bootstrap && echo 'Environment is ready'"
 
 [tasks.vault-decrypt]
@@ -69,22 +82,6 @@ run = "./.venv/bin/ansible-vault decrypt ansible/inventory/group_vars/all/vault.
 [tasks.vault-encrypt]
 description = "Re-encrypt the Ansible vault after editing"
 run = "./.venv/bin/ansible-vault encrypt ansible/inventory/group_vars/all/vault.yml"
-
-[tasks.vault-setup]
-description = "Create ansible/.vault_pass placeholder if missing"
-run = '''
-#!/usr/bin/env bash
-set -euo pipefail
-VAULT_PASS="ansible/.vault_pass"
-if [ ! -f "$VAULT_PASS" ]; then
-  echo "REPLACE_WITH_VAULT_PASSWORD" > "$VAULT_PASS"
-  chmod 600 "$VAULT_PASS"
-  echo "Created $VAULT_PASS with placeholder — replace with real password"
-else
-  chmod 600 "$VAULT_PASS"
-  echo "$VAULT_PASS already exists — permissions ensured (600)"
-fi
-'''
 
 [tasks.provision]
 description = "Provision a host (usage: mise run provision -- --limit HOST)"
@@ -101,3 +98,11 @@ run = "ansible-playbook ansible/playbooks/weekly-update.yml"
 [tasks.lint]
 description = "Lint Ansible playbooks and roles with ansible-lint"
 run = "ansible-lint ansible/"
+
+# ── Hooks ──────────────────────────────────────────────────────────────────
+# Auto-run `bootstrap` when the project is entered (cd into the directory).
+# Idempotent: mise skips it if `sources` are unchanged and `outputs` (.venv) exist.
+# This makes the project fully self-setting-up — env vars, tools, .venv, and SSH key
+# are all ready the moment you enter the directory, on any host with mise activated.
+[hooks]
+enter = { task = "bootstrap" }

@@ -263,14 +263,20 @@ Secrets are managed by [fnox](https://github.com/jdx/fnox) via `fnox.toml`:
 
 **First-time setup:**
 ```bash
-# 1. Activate mise in your shell (once)
+# 1. Activate mise in your shell (once — managed by `mise bootstrap` in ~/.dotfiles)
 eval "$(mise activate bash)"   # or zsh/fish
 
 # 2. Create vault password file (placeholder — replace with real password)
 echo 'real-vault-password' > ansible/.vault_pass
 chmod 600 ansible/.vault_pass
 
-# 3. Run setup (installs tools, creates .venv, extracts infra SSH key from vault)
+# 3. Enter the project — the [hooks] enter hook auto-runs `bootstrap`:
+#    - installs tools (python, gh, fnox, age)
+#    - creates .venv with ansible + ansible-lint
+#    - extracts infra SSH key from vault → ./.hetzner-infra-ed25519
+cd /path/to/hetzner-bare-metal-fleet
+
+# Alternative: run setup explicitly (installs tools + runs bootstrap)
 ./setup.sh        # thin wrapper for `mise run setup`
 
 # 4. Encrypt secrets into fnox.toml (one-time per secret)
@@ -278,6 +284,12 @@ fnox set HETZNER_ROBOT_PASSWORD "your-password" --provider age
 ```
 
 `setup.sh` is a thin wrapper that delegates to `mise run setup`. All setup logic lives in `mise.toml` tasks — do not add logic to `setup.sh`.
+
+### Auto-setup on directory entry
+
+The `[hooks] enter` hook in `mise.toml` automatically runs the `bootstrap` task when you `cd` into the project (only on first entry per session, not on every `cd` within the project). The task is idempotent — mise skips it when `sources` (`mise.toml`, `ansible/requirements.yml`, `ansible/.vault_pass`) are unchanged and `outputs` (`.venv`, `.hetzner-infra-ed25519`) already exist.
+
+This means: **on any host with mise shell activation installed, entering this directory is sufficient to make all tools, env vars, and the infra SSH key available.** No manual `./setup.sh` is required for normal development.
 
 ---
 
