@@ -43,6 +43,14 @@
       when:
         - reboot_required_file.stat.exists
         - enable_reboot | default(true) | bool
+      register: reboot_result
+
+    - name: Wait 30 seconds before next host reboots
+      pause:
+        seconds: "{{ reboot_pause_seconds | default(30) }}"
+      when:
+        - reboot_result is changed
+        - enable_reboot | default(true) | bool
 
 # ── Play 3: Update beszel hub on uptime-monitor-1 ───────────────────────────
 - name: Update beszel hub
