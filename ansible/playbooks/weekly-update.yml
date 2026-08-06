@@ -45,9 +45,9 @@
         - enable_reboot | default(true) | bool
       register: reboot_result
 
-    - name: Wait 30 seconds before next host reboots
+    - name: Wait 60 seconds before next host reboots
       pause:
-        seconds: "{{ reboot_pause_seconds | default(30) }}"
+        seconds: "{{ reboot_pause_seconds | default(60) }}"
       when:
         - reboot_result is changed
         - enable_reboot | default(true) | bool
