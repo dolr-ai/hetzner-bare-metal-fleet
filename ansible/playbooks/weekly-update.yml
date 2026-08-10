@@ -2,7 +2,9 @@
 # Weekly maintenance playbook.
 # Runs in order:
 #   1. Full apt upgrade + beszel agent refresh on all bare metal hosts (parallel)
-#   2. Rolling reboot of any host that has /var/run/reboot-required set (serial: 1)
+#   2. Rolling reboot of NON-cluster hosts that need it (serial: 1)
+#   2b. Rolling reboot of the Patroni Postgres cluster (rishi-4/5/6), gated on
+#       cluster health so the DB quorum never loses more than one node at a time
 #   3. Update beszel hub on uptime-monitor-1
 #   4. Reset authorized_keys to canonical set on all bare metal hosts
 #
@@ -22,9 +24,12 @@
         enable_reboot: false   # reboots handled separately in play 2
     - role: beszel_agent
 
-# ── Play 2: Rolling reboot of hosts that require it ─────────────────────────
-- name: Reboot hosts that require it (rolling)
-  hosts: bare_metal
+# ── Play 2: Rolling reboot of NON-cluster hosts that require it ─────────────
+# The Patroni Postgres quorum (rishi-4/5/6) is EXCLUDED here via
+# `bare_metal:!patroni_cluster` and handled by the health-gated Play 2b below,
+# so this generic reboot can never take down more than one DB node at a time.
+- name: Reboot non-cluster hosts that require it (rolling)
+  hosts: bare_metal:!patroni_cluster
   serial: 1
   max_fail_percentage: 50
   gather_facts: false
@@ -37,17 +42,81 @@
     - name: Reboot if required
       reboot:
         msg: "Rebooting after package upgrades (kernel or critical libraries updated)"
-        reboot_timeout: 300
+        reboot_timeout: 600         # bare-metal POST can take several minutes
         connect_timeout: 20
+        post_reboot_delay: 30        # let services settle before we call it "up"
         test_command: uptime
       when:
         - reboot_required_file.stat.exists
         - enable_reboot | default(true) | bool
       register: reboot_result
 
-    - name: Wait 60 seconds before next host reboots
+    - name: Confirm the host actually came back (guard against early return)
+      # The reboot module can return prematurely when SSH ControlPersist keeps a
+      # stale socket alive; wait_for_connection re-verifies the host is truly up.
+      wait_for_connection:
+        delay: 15
+        timeout: 600
+      when:
+        - reboot_result is changed
+        - enable_reboot | default(true) | bool
+
+    - name: Wait before next host reboots
       pause:
         seconds: "{{ reboot_pause_seconds | default(60) }}"
+      when:
+        - reboot_result is changed
+        - enable_reboot | default(true) | bool
+
+# ── Play 2b: Rolling reboot of the Patroni Postgres cluster (health-gated) ──
+# rishi-4/5/6 form ONE Postgres HA cluster. If they reboot too close together,
+# all three DBs go down at once and Patroni cannot elect a leader on the way
+# back up -> full v2 outage (this happened 2026-08-10, all three rebooted within
+# 35 seconds). Unlike Play 2, this waits for the WHOLE cluster to be healthy
+# again (a leader + all members `running`) before rebooting the next node, and
+# STOPS the rollout (max_fail_percentage: 0) if a node does not rejoin -- so the
+# quorum never loses more than one node at a time.
+- name: Reboot the Patroni Postgres cluster (rolling, cluster-health-gated)
+  hosts: patroni_cluster
+  serial: 1
+  max_fail_percentage: 0     # if a DB node does not rejoin, STOP -- do not reboot the next
+  gather_facts: false
+  tasks:
+    - name: Check if reboot is required
+      stat:
+        path: /var/run/reboot-required
+      register: reboot_required_file
+
+    - name: Reboot if required
+      reboot:
+        msg: "Rolling DB-cluster reboot after package upgrades"
+        reboot_timeout: 900
+        connect_timeout: 20
+        post_reboot_delay: 30
+        test_command: uptime
+      when:
+        - reboot_required_file.stat.exists
+        - enable_reboot | default(true) | bool
+      register: reboot_result
+
+    - name: Wait until Patroni reports a leader + all 3 members running
+      # Poll patronictl on this node until the cluster is fully healthy. Only
+      # then is it safe to move on and reboot the next DB node. Runs on the host
+      # (Ansible connects as root, which has docker access).
+      shell: |
+        cid=$(docker ps -q --filter "name=yral-v2-patroni_patroni-{{ inventory_hostname }}" | head -1)
+        [ -n "$cid" ] || exit 1
+        out=$(docker exec "$cid" patronictl list yral-v2-postgres 2>/dev/null)
+        leaders=$(printf '%s\n' "$out" | grep -cw Leader)
+        running=$(printf '%s\n' "$out" | grep -cw running)
+        [ "$leaders" -eq 1 ] && [ "$running" -ge 3 ]
+      args:
+        executable: /bin/bash
+      register: db_cluster_health
+      until: db_cluster_health.rc == 0
+      retries: 60                # ~10 minutes (60 x 10s) for the node to rejoin
+      delay: 10
+      changed_when: false
       when:
         - reboot_result is changed
         - enable_reboot | default(true) | bool
