@@ -14,7 +14,7 @@ github_actions_ssh_private_key: "{{ vault_github_actions_ssh_private_key }}"
 # Beszel monitoring configuration
 beszel_hub_url: "https://beszel.yral.com"
 beszel_listen_port: 45876
-beszel_ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFbMj/W6oT9440QejCiVlJbnuBlWK/mCxJnzEHO1dOYq"
+beszel_ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINkmr8wZEhKAk3UALLB+3AnQsSgkgGjxoiqJ5Zv8glh9"
 # Universal token (from /settings/tokens on the Beszel hub) — allows agents to
 # auto-register without needing a per-system token. Per-host vault values in
 # host_vars/*/vault.yml take precedence over this if both are defined.
