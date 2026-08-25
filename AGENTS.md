@@ -16,7 +16,7 @@ inventory group.  All hosts are treated equally — there are no sub-groups with
 |---|---|
 | `bare_metal` | All 27 bare-metal hosts — primary target for all plays |
 
-Monitoring hub: `uptime-monitor-1` runs the Beszel hub at `https://beszel.yral.com`.
+Monitoring hub: the Beszel hub runs on the yral-bare-metal-kubernetes-cluster as a Flux-managed Deployment, accessible at `https://beszel.yral.com`. Agents on each fleet host connect to this hub.
 
 ---
 
@@ -55,7 +55,6 @@ setup.sh                        # idempotent local setup (mise install + galaxy 
 | `ssh_security` | Hardens sshd config; resets `authorized_keys` to canonical set |
 | `docker` | Idempotent Docker CE install via official upstream repo |
 | `beszel_agent` | Upserts `beszel-agent` service in `/root/docker-compose.yml` |
-| `beszel_hub` | Pulls latest hub image and restarts the hub service on `uptime-monitor-1` |
 | `ssh_key_grant` | Adds a single team member's key — temporary; revoked on next weekly run |
 
 Each role follows the standard Ansible structure:
@@ -201,12 +200,15 @@ Roles that only run locally (e.g., `hetzner_rescue`) or only use raw/shell befor
 
 ## Beszel Monitoring
 
+The Beszel hub runs on the yral-bare-metal-kubernetes-cluster as a Flux-managed
+Deployment (see `kubernetes/infrastructure/beszel/` in that repo). This repo only
+manages the agents that run on each fleet host.
+
 - **Agent token**: `beszel_agent_token` — universal token from `group_vars/all/vault.yml`
   (`vault_beszel_agent_token`). Allows agents to auto-register without prior system creation.
   No per-host token overrides are used.
 - **Hub URL**: `beszel_hub_url` — `https://beszel.yral.com` (defined in `group_vars/all/vars.yml`).
-- **Hub host**: `uptime-monitor-1` — the only host where `beszel_hub` role runs.
-- **Hub service name**: default `beszel` (override via `beszel_hub_service_name`).
+  Unchanged from when the hub ran on `uptime-monitor-1`; now served by the k8s cluster.
 - The agent compose block uses `blockinfile` with marker `ANSIBLE MANAGED BLOCK - BESZEL AGENT`
   and the cleanup script `roles/beszel_agent/files/cleanup_beszel.py` removes stale entries.
 

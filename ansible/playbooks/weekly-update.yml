@@ -3,8 +3,11 @@
 # Runs in order:
 #   1. Full apt upgrade + beszel agent refresh on all bare metal hosts (parallel)
 #   2. Rolling reboot of any host that has /var/run/reboot-required set (serial: 1)
-#   3. Update beszel hub on uptime-monitor-1
-#   4. Reset authorized_keys to canonical set on all bare metal hosts
+#   3. Reset authorized_keys to canonical set on all bare metal hosts
+#
+# The Beszel hub is no longer managed by this playbook — it now runs on the
+# yral-bare-metal-kubernetes-cluster as a Flux-managed Deployment. The hub URL
+# (https://beszel.yral.com) is unchanged; agents connect to the k8s-hosted hub.
 #
 # Usage:
 #   ansible-playbook ansible/playbooks/weekly-update.yml
@@ -79,14 +82,7 @@
         - reboot_required_file.stat.exists
         - enable_reboot | default(true) | bool
 
-# ── Play 3: Update beszel hub on uptime-monitor-1 ───────────────────────────
-- name: Update beszel hub
-  hosts: uptime-monitor-1
-  gather_facts: false
-  roles:
-    - role: beszel_hub
-
-# ── Play 4: Reset SSH authorized_keys to canonical set on all hosts ─────────
+# ── Play 3: Reset SSH authorized_keys to canonical set on all hosts ─────────
 - name: Reset SSH authorized_keys to canonical set
   hosts: bare_metal
   gather_facts: false
