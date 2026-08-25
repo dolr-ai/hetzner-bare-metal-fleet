@@ -39,11 +39,10 @@ run = '''
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Ensure vault password file exists (placeholder if missing — user must replace with real password)
-if [ ! -f ansible/.vault_pass ]; then
-  echo "REPLACE_WITH_VAULT_PASSWORD" > ansible/.vault_pass
-  chmod 600 ansible/.vault_pass
-  echo '  ⚠ Created ansible/.vault_pass placeholder — replace with real vault password to extract SSH key'
+# Ensure parent repo's vault password file exists
+if [ ! -f ../../ansible/.vault_pass ]; then
+  echo '  ⚠ Parent repo vault password file not found at ../../ansible/.vault_pass'
+  echo '  Run mise run bootstrap in the parent yral-bare-metal-kubernetes-cluster repo first'
 fi
 
 # Create venv and install Python tooling (idempotent — venv module updates in place)
@@ -53,7 +52,7 @@ python -m venv .venv && ./.venv/bin/pip install --upgrade pip && ./.venv/bin/pip
 # Used by fnox (age provider) to decrypt secrets. Idempotent — skips if already present.
 # Resilient to wrong/placeholder vault passwords — prints warning instead of failing.
 if [ ! -f .hetzner-infra-ed25519 ]; then
-  if ./.venv/bin/ansible-vault view ansible/inventory/group_vars/all/vault.yml --vault-password-file ansible/.vault_pass 2>/dev/null | \
+  if ./.venv/bin/ansible-vault view ansible/inventory/group_vars/all/vault.yml --vault-password-file ../../ansible/.vault_pass 2>/dev/null | \
      ./.venv/bin/python -c "import sys, yaml; print(yaml.safe_load(sys.stdin)['vault_github_actions_ssh_private_key'])" \
      > .hetzner-infra-ed25519 2>/dev/null; then
     chmod 600 .hetzner-infra-ed25519
@@ -66,9 +65,9 @@ else
   echo '  ✓ Infra SSH key already at .hetzner-infra-ed25519'
 fi
 '''
-# `ansible/.vault_pass` in sources ensures re-run when the user creates/updates the vault password.
+# `../../ansible/.vault_pass` in sources ensures re-run when the parent repo's vault password changes.
 # `.venv` in outputs enables fast-skipping when nothing changed.
-sources = ["mise.toml", "ansible/requirements.yml", "ansible/.vault_pass"]
+sources = ["mise.toml", "ansible/requirements.yml", "../../ansible/.vault_pass"]
 outputs = [".venv", ".hetzner-infra-ed25519"]
 
 [tasks.setup]
